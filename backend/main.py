@@ -32,6 +32,9 @@ from routers.main.files_tasks_groups_router import router as files_tasks_groups_
 from routers.main.repository_router import router as repository_router
 from routers.main.repository_groups_router import router as repository_groups_router
 from routers.main.comments_router import router as comments_router
+from routers.main.project_router import router as project_router
+from routers.main.proyectusers_router import router as project_users_router
+from routers.main.proyectviews_router import router as project_views_router
 
 
 #main
@@ -68,6 +71,9 @@ app.include_router(files_tasks_groups_router)
 app.include_router(repository_router)
 app.include_router(repository_groups_router)
 app.include_router(comments_router)
+app.include_router(project_router)
+app.include_router(project_users_router)
+app.include_router(project_views_router)
 
 #Funcion de Sesion de la base de datos 
 def get_db():

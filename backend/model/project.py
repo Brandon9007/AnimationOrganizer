@@ -8,10 +8,11 @@ class Project(Base):
     
     project_pk = Column(Integer, primary_key=True, index=True)
     project_name = Column(String)
-    views_fk = Column(Integer, ForeignKey("views.views_pk"))
-    users_fk = Column(Integer, ForeignKey("user.user_pk")) 
+    project_description = Column(String)
+    start_date = Column(Date, default=datetime.utcnow)
     is_active = Column(Boolean, default=True)
     
+    
     # Relationships
-    views = relationship("Views", back_populates="project")
-    user = relationship("User", back_populates="project")
+    project_views = relationship("ProjectViews", back_populates="project")
+    project_users = relationship("ProjectUsers", back_populates="project")

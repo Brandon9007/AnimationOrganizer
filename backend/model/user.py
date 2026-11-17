@@ -23,4 +23,4 @@ class User(Base):
     #Relationships
     role = relationship("Role", back_populates="users")
     group_tasks = relationship("GroupTasks", back_populates="user")
-    project = relationship("Project",back_populates="user")
+    project_users = relationship("ProjectUsers", back_populates="user")

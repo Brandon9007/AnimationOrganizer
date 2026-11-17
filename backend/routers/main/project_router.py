@@ -3,19 +3,7 @@ from pydantic import BaseModel
 from typing import List
 from datetime import date
 
-from model.user import User
-from model.rol import Role
-from model.tasks import Tasks
-from model.files_tasks import FilesTasks
-from model.files_tasks_groups import FilesTasksGroups
-from model.files_tasks_type import FilesTasksTypes
-from model.groups_tasks_views import GroupsTasksViews
-from model.groups_tasks import GroupTasks
-from model.permisions import Permissions
-from model.permissions_group import PermissionsGroup
-from model.views import Views   
 from model.project import Project
-from model.repository import Repository
 
 from sqlalchemy.orm import Session
 from database.database import SessionLocal, engine
@@ -25,8 +13,8 @@ router = APIRouter()
 class ProjectClass(BaseModel):
     project_pk: int
     project_name: str
-    views_fk: int
-    users_fk: int
+    project_description: str
+    start_date: date
     is_active: bool
     
 # Conexion a la base de datos 
@@ -68,8 +56,8 @@ def create_project(
     new_project = Project(
         project_pk=project_data.project_pk,
         project_name=project_data.project_name,
-        views_fk=project_data.views_fk,
-        users_fk=project_data.users_fk,
+        project_description=project_data.project_description,
+        start_date=project_data.start_date,
         is_active=project_data.is_active
     )
 
@@ -92,8 +80,8 @@ def create_projects_bulk(
         Project(
             project_pk=item.project_pk,
             project_name=item.project_name,
-            views_fk=item.views_fk,
-            users_fk=item.users_fk,
+            project_description=item.project_description,
+            start_date=item.start_date,
             is_active=item.is_active
         )
         for item in projects_list
@@ -124,8 +112,8 @@ def update_project(
         )
 
     project_actual.project_name = project_data.project_name
-    project_actual.views_fk = project_data.views_fk
-    project_actual.users_fk = project_data.users_fk
+    project_actual.project_description = project_data.project_description
+    project_actual.start_date = project_data.start_date
     project_actual.is_active = project_data.is_active
 
     db.commit()

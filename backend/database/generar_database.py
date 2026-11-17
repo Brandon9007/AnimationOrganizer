@@ -16,7 +16,8 @@ from model.repository import Repository
 from model.project import Project
 from model.comments import Comments
 from model.repository_groups import RepositoryGroups
-
+from model.proyectusers import ProjectUsers
+from model.proyectviews import ProjectViews
 
 Base.metadata.create_all(bind=engine)
 
