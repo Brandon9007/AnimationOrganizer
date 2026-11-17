@@ -1,7 +1,10 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, File, UploadFile
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import date
+
+import os 
+import shutil
 
 from model.user import User
 from model.rol import Role
@@ -189,3 +192,23 @@ async def borrar_task(tasks_pk: int, db: Session = Depends(get_db)):
     db.commit()
     
     return {"mensaje": f"Task con ID {tasks_pk} desactivado correctamente"}
+
+#Importante para los archivos multimedia 
+#POST 
+@router.post("/tasks/{task_id}/upload")
+async def upload_task_file(task_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    task = db.query(Tasks).filter(Tasks.tasks_pk == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    # Guardar el archivo localmente
+    file_location = f"uploads/{task_id}_{file.filename}"
+    with open(file_location, "wb+") as file_object:
+        shutil.copyfileobj(file.file, file_object)
+
+    # Actualizar la base de datos
+    task.file_path = file_location
+    db.commit()
+    db.refresh(task)
+
+    return {"message": "Archivo subido correctamente", "file_path": file_location}

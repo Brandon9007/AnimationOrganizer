@@ -10,7 +10,6 @@ function ViewsSection({
   handleUpdateView,
   handleDeleteView,
 
-  // Recibimos los métodos de Drag and Drop
   onDragStartView,
   onDragOverView,
   onDropView,
@@ -20,20 +19,19 @@ function ViewsSection({
   openDropdownViewId,
   toggleTaskDropdown,
 
-  // Props que bajan hasta TasksSection
   tasks,
   openTaskModal,
   openEditTaskModal,
   handleToggleLock,
   handleDeleteTask,
 
-  //Comentarios
   handleToggleStatus,
   taskComments,
   fetchTaskComments,
   handleAddComment,
-  currentUserRole
+  currentUserRole,
 
+  fetchTasks // <-- Recibido desde Pipeline
 }) {
   return (
     <div className="views-section-container">
@@ -74,37 +72,14 @@ function ViewsSection({
 
                 <div className="view-item-header">
                   <h4>{view.views_name}</h4>
-
                   <div className="view-actions">
-                    <button
-                      className="view-action-btn update-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleUpdateView(view.views_pk, view.views_order);
-                      }}
-                    >
-                      PUT
-                    </button>
-                    <button
-                      className="view-action-btn delete-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteView(view.views_pk);
-                      }}
-                    >
-                      DELETE
-                    </button>
+                    <button className="view-action-btn update-btn" onClick={(e) => { e.stopPropagation(); handleUpdateView(view.views_pk, view.views_order); }}>PUT</button>
+                    <button className="view-action-btn delete-btn" onClick={(e) => { e.stopPropagation(); handleDeleteView(view.views_pk); }}>DELETE</button>
                   </div>
                 </div>
 
                 <div className="task-dropdown-container">
-                  <button
-                    className="task-dropdown-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleTaskDropdown(view.views_pk);
-                    }}
-                  >
+                  <button className="task-dropdown-btn" onClick={(e) => { e.stopPropagation(); toggleTaskDropdown(view.views_pk); }}>
                     Opciones de Tareas {openDropdownViewId === view.views_pk ? '▲' : '▼'}
                   </button>
 
@@ -117,13 +92,12 @@ function ViewsSection({
                         openEditTaskModal={openEditTaskModal}
                         handleToggleLock={handleToggleLock}
                         handleDeleteTask={handleDeleteTask}
-
                         handleToggleStatus={handleToggleStatus}
                         taskComments={taskComments}
                         fetchTaskComments={fetchTaskComments}
                         handleAddComment={handleAddComment}
                         currentUserRole={currentUserRole}
-
+                        fetchTasks={fetchTasks} // <-- Pasa la función hacia TasksSection
                       />
                     </div>
                   )}

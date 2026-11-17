@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List
 
-from model.project_users import ProjectUsers
+from model.proyectusers import ProjectUsers
 
 from sqlalchemy.orm import Session
 from database.database import SessionLocal, engine

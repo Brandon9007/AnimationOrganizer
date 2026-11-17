@@ -10,7 +10,6 @@ const ProtectedRoute = ({ allowedRoles }) => {
     }
 
     if (allowedRoles && !allowedRoles.includes(userRole)) {
-        // Lo redirigimos a una pantalla segura para él
         return <Navigate to="/dashboard" replace />;
     }
 

@@ -40,6 +40,11 @@ from routers.main.proyectviews_router import router as project_views_router
 #main
 app = FastAPI()
 
+#Carpeta uploads
+os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+
 #middleware
 #Rutas del frontend que se permiten para hacer peticiones al backend
 origins = [
@@ -82,4 +87,3 @@ def get_db():
         yield db
     finally:
         db.close()
-

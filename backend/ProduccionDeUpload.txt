@@ -1,0 +1,3 @@
+AWS S3, Google Cloud Storage (GCS) o Cloudinary
+
+Ahorita usaremos la carpeta uploads para los archivos multimedia 

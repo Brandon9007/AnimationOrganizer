@@ -26,6 +26,8 @@ class Tasks(Base):
     is_estatic= Column(Boolean, default= False)#Al agregar una task se le pregunta al usario en el front
                                                 #Si la task sera estatica o sera un proyecto de aniamcion
 
+    #Path de los archivos enlazados a los archivos 
+    file_path = Column(String, nullable=True)
 
 
     is_active = Column(Boolean, default=True)
