@@ -467,3 +467,267 @@
   margin: 5px 0;
   font-style: italic;
 }
+
+/* --- Reproductor y Capas --- */
+.video-element {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.video-screen {
+  background-color: #000;
+  position: relative;
+  overflow: hidden;
+}
+
+.video-layer-wrapper {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+}
+
+.video-layer-img {
+  max-height: 100%;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.no-content-message {
+  color: white;
+  text-align: center;
+  width: 100%;
+  padding-top: 20%;
+}
+
+/* --- Controles de Video y Zoom --- */
+.video-controls-centered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 15px;
+  padding: 10px 0;
+}
+
+.timeline-time-display {
+  color: #aaa;
+  font-size: 14px;
+  margin-left: 20px;
+}
+
+.timeline-zoom-box {
+  width: 200px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-left: 20px;
+}
+
+.timeline-zoom-slider {
+  color: #4a90e2 !important;
+}
+
+/* --- Timeline Visual --- */
+.timeline-task-tracks {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  height: 100px;
+  background-color: #111;
+  margin-bottom: 5px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  position: relative;
+}
+
+.timeline-inner-track {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  position: relative;
+  transition: min-width 0.2s ease-out;
+}
+
+.timeline-task-block {
+  min-width: 30px;
+  height: 100%;
+  background-color: #2196F3;
+  border: 1px solid #000;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  user-select: none;
+  cursor: grab;
+  flex-shrink: 0;
+}
+
+.timeline-task-block.is-video {
+  background-color: #9b59b6;
+}
+
+.timeline-task-block.is-static {
+  background-color: #555;
+  cursor: not-allowed;
+}
+
+.timeline-task-block.is-playing {
+  border: 3px solid #ffeb3b;
+}
+
+.timeline-task-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.4;
+  z-index: 0;
+}
+
+.timeline-task-label {
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 5px;
+}
+
+.timeline-task-filename {
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.timeline-resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  background-color: rgba(255, 255, 255, 0.6);
+  cursor: ew-resize;
+  z-index: 2;
+}
+
+.timeline-empty-message {
+  color: #555;
+  font-size: 12px;
+  width: 100%;
+  text-align: center;
+  line-height: 40px;
+}
+
+/* --- Barra de Progreso --- */
+.video-controls-bar {
+  padding: 10px;
+  width: 100%;
+}
+
+.progress-bar-container {
+  width: 100%;
+}
+
+.progress-bar {
+  width: 100%;
+  cursor: pointer;
+}
+
+/* --- Modales (Crear y Editar Tarea) --- */
+.task-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.task-modal-content {
+  background: #2c303a;
+  padding: 25px;
+  border-radius: 8px;
+  width: 400px;
+  color: white;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+}
+
+.task-modal-title {
+  margin-top: 0;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #444;
+  padding-bottom: 10px;
+}
+
+.task-modal-label {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.task-modal-input,
+.task-modal-textarea,
+.task-modal-select {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 15px;
+  border-radius: 4px;
+  border: 1px solid #555;
+  background: #1e2128;
+  color: white;
+}
+
+.task-modal-textarea {
+  min-height: 80px;
+}
+
+.task-modal-input-last {
+  margin-bottom: 20px;
+}
+
+.task-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modal-btn-cancel {
+  padding: 8px 15px;
+  background: #555;
+  border: none;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.modal-btn-save {
+  padding: 8px 15px;
+  background: #4a90e2;
+  border: none;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.modal-btn-update {
+  padding: 8px 15px;
+  background: #4caf50;
+  border: none;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}

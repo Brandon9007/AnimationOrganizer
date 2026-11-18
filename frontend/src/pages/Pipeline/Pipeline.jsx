@@ -20,9 +20,7 @@ const formatDuration = (totalSeconds) => {
   return `${h}:${m}:${s}`;
 };
 
-
-
-// URL de tu Backend
+//Backend
 const API_BASE_URL = 'http://localhost:8000';
 
 function LayerVideo({ src, localTimeMs, isPlaying }) {
@@ -46,13 +44,10 @@ function LayerVideo({ src, localTimeMs, isPlaying }) {
       ref={ref}
       src={src}
       className="video-element"
-      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
       muted={false}
     />
   );
 }
-
-
 
 function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
   const videoRef = useRef(null);
@@ -106,13 +101,11 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
     fetchTasks();
   }, []);
 
-  // Reiniciar el reproductor cuando se cambia de vista
   useEffect(() => {
     setGlobalProgressMs(0);
     setIsPlaying(false);
   }, [activeTimelineViewId]);
 
-  // Lista de tareas ordenadas activas para la línea de tiempo
   const activeTasks = useMemo(() => {
     return activeTimelineViewId
       ? tasks.filter(t => t.views_pk === activeTimelineViewId && t.is_active !== false).sort((a, b) => a.tasks_order - b.tasks_order)
@@ -132,11 +125,10 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
       }
       accMs += durMs;
     }
-    return null; // Si esta view es más corta que la seleccionada, no muestra nada al terminar
+    return null;
   };
 
-
-  // Calcular métricas de la línea de tiempo
+  //Metricas de la timeline
   const { totalDurationMs, currentTaskIndex, currentTask, localTaskProgressMs } = useMemo(() => {
     let totalMs = 0;
     let activeIdx = 0;
@@ -151,7 +143,6 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
       totalMs += taskDurationMs;
     }
 
-    // Manejar el final de la secuencia
     if (globalProgressMs >= totalMs && activeTasks.length > 0) {
       activeIdx = activeTasks.length - 1;
       localProgMs = parseDuration(activeTasks[activeTasks.length - 1].tasks_duration) * 1000;
@@ -165,12 +156,10 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
     };
   }, [activeTasks, globalProgressMs]);
 
-  // Variables booleanas para identificar el tipo de clip actual
   const hasMedia = !!currentTask?.file_path;
   //const isImageMedia = hasMedia && currentTask.file_path.match(/\.(jpeg|jpg|gif|png)$/i);
   const isVideoMedia = hasMedia && currentTask.file_path.match(/\.(mp4|webm|ogg|mov)$/i);
 
-  // --- MOTOR DEL REPRODUCTOR VIRTUAL GLOBAL ---
   useEffect(() => {
     let interval;
     if (isPlaying && totalDurationMs > 0) {
@@ -190,12 +179,10 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
     return () => clearInterval(interval);
   }, [isPlaying, totalDurationMs]);
 
-  // Sincronizar video nativo con el tiempo local
   useEffect(() => {
     if (currentTask && isVideoMedia && videoRef.current) {
       const targetTime = localTaskProgressMs / 1000;
 
-      // Si el video está muy desfasado (por un seek o cambio de clip), actualizarlo
       if (Math.abs(videoRef.current.currentTime - targetTime) > 0.5) {
         videoRef.current.currentTime = targetTime;
       }
@@ -211,7 +198,7 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
   const togglePlay = () => {
     if (activeTasks.length === 0) return;
     if (!isPlaying && globalProgressMs >= totalDurationMs) {
-      setGlobalProgressMs(0); // Reiniciar si terminó
+      setGlobalProgressMs(0);
     }
     setIsPlaying(!isPlaying);
   };
@@ -243,11 +230,10 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
     const handleMouseMove = (moveEvent) => {
       if (!dragRef.current.isDragging) return;
       const deltaX = moveEvent.clientX - dragRef.current.startX;
-      // Calcula duración total visible para proporción de resize
       const visibleDur = Math.max(totalDurationMs / 1000, 300);
       const deltaSecs = (deltaX / dragRef.current.timelineWidth) * visibleDur;
 
-      // MINIMUM DURATION = 2 SECONDS
+      //Duracion mnima de las tasks le puse 1 segundo 
       let newDur = Math.max(1, dragRef.current.startDur + deltaSecs);
       setTasks(prev => prev.map(t => t.tasks_pk === dragRef.current.taskId ? { ...t, tasks_duration: formatDuration(newDur) } : t));
     };
@@ -396,7 +382,7 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
       task_updated_at: todayDate,
       task_due_date: taskForm.task_due_date || todayDate,
       tasks_order: tasks.filter(t => t.views_pk === targetViewId).length + 1,
-      tasks_duration: taskForm.is_estatic ? "00:00:01" : "00:01:00", // Start static tasks at 2 sec min
+      tasks_duration: taskForm.is_estatic ? "00:00:01" : "00:01:00",
       is_estatic: taskForm.is_estatic,
       is_active: true
     };
@@ -505,45 +491,78 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
   return (
     <div className="pipeline-container">
 
-      {/* Modales... */}
+      {/* Modal: Crear Tarea */}
       {isModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0, 0, 0, 0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
-          <div style={{ background: '#2c303a', padding: '25px', borderRadius: '8px', width: '400px', color: 'white', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }}>
-            <h3 style={{ marginTop: 0, marginBottom: '20px', borderBottom: '1px solid #444', paddingBottom: '10px' }}>Crear Nueva Tarea</h3>
-            <label style={{ display: 'block', marginBottom: '5px' }}>Nombre de la tarea:</label>
-            <input type="text" value={taskForm.task_name} onChange={(e) => setTaskForm({ ...taskForm, task_name: e.target.value })} style={{ width: '100%', padding: '8px', marginBottom: '15px', borderRadius: '4px', border: '1px solid #555', background: '#1e2128', color: 'white' }} />
-            <label style={{ display: 'block', marginBottom: '5px' }}>Descripción:</label>
-            <textarea value={taskForm.task_description} onChange={(e) => setTaskForm({ ...taskForm, task_description: e.target.value })} style={{ width: '100%', padding: '8px', marginBottom: '15px', borderRadius: '4px', border: '1px solid #555', background: '#1e2128', color: 'white', minHeight: '80px' }} />
-            <label style={{ display: 'block', marginBottom: '5px' }}>Fecha de Entrega (Due Date):</label>
-            <input type="date" value={taskForm.task_due_date} onChange={(e) => setTaskForm({ ...taskForm, task_due_date: e.target.value })} style={{ width: '100%', padding: '8px', marginBottom: '20px', borderRadius: '4px', border: '1px solid #555', background: '#1e2128', color: 'white' }} />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button onClick={closeTaskModal} style={{ padding: '8px 15px', background: '#555', border: 'none', color: 'white', borderRadius: '4px', cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={handleCreateTask} style={{ padding: '8px 15px', background: '#4a90e2', border: 'none', color: 'white', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Guardar Tarea</button>
+        <div className="task-modal-overlay">
+          <div className="task-modal-content">
+            <h3 className="task-modal-title">Crear Nueva Tarea</h3>
+            <label className="task-modal-label">Nombre de la tarea:</label>
+            <input
+              type="text"
+              className="task-modal-input"
+              value={taskForm.task_name}
+              onChange={(e) => setTaskForm({ ...taskForm, task_name: e.target.value })}
+            />
+            <label className="task-modal-label">Descripción:</label>
+            <textarea
+              className="task-modal-textarea"
+              value={taskForm.task_description}
+              onChange={(e) => setTaskForm({ ...taskForm, task_description: e.target.value })}
+            />
+            <label className="task-modal-label">Fecha de Entrega (Due Date):</label>
+            <input
+              type="date"
+              className="task-modal-input task-modal-input-last"
+              value={taskForm.task_due_date}
+              onChange={(e) => setTaskForm({ ...taskForm, task_due_date: e.target.value })}
+            />
+            <div className="task-modal-actions">
+              <button onClick={closeTaskModal} className="modal-btn-cancel">Cancelar</button>
+              <button onClick={handleCreateTask} className="modal-btn-save">Guardar Tarea</button>
             </div>
           </div>
         </div>
       )}
 
+      {/* Modal: Actualizar Tarea */}
       {editTaskForm && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0, 0, 0, 0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
-          <div style={{ background: '#2c303a', padding: '25px', borderRadius: '8px', width: '400px', color: 'white', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }}>
-            <h3 style={{ marginTop: 0, marginBottom: '20px', borderBottom: '1px solid #444', paddingBottom: '10px' }}>Actualizar Tarea</h3>
-            <label style={{ display: 'block', marginBottom: '5px' }}>Nombre:</label>
-            <input type="text" value={editTaskForm.task_name} onChange={(e) => setEditTaskForm({ ...editTaskForm, task_name: e.target.value })} style={{ width: '100%', padding: '8px', marginBottom: '15px', borderRadius: '4px', border: '1px solid #555', background: '#1e2128', color: 'white' }} />
-            <label style={{ display: 'block', marginBottom: '5px' }}>Descripción:</label>
-            <textarea value={editTaskForm.task_description} onChange={(e) => setEditTaskForm({ ...editTaskForm, task_description: e.target.value })} style={{ width: '100%', padding: '8px', marginBottom: '15px', borderRadius: '4px', border: '1px solid #555', background: '#1e2128', color: 'white', minHeight: '80px' }} />
-            <label style={{ display: 'block', marginBottom: '5px' }}>Estatus:</label>
-            <select value={editTaskForm.task_status} onChange={(e) => setEditTaskForm({ ...editTaskForm, task_status: e.target.value })} style={{ width: '100%', padding: '8px', marginBottom: '15px', borderRadius: '4px', border: '1px solid #555', background: '#1e2128', color: 'white' }}>
+        <div className="task-modal-overlay">
+          <div className="task-modal-content">
+            <h3 className="task-modal-title">Actualizar Tarea</h3>
+            <label className="task-modal-label">Nombre:</label>
+            <input
+              type="text"
+              className="task-modal-input"
+              value={editTaskForm.task_name}
+              onChange={(e) => setEditTaskForm({ ...editTaskForm, task_name: e.target.value })}
+            />
+            <label className="task-modal-label">Descripción:</label>
+            <textarea
+              className="task-modal-textarea"
+              value={editTaskForm.task_description}
+              onChange={(e) => setEditTaskForm({ ...editTaskForm, task_description: e.target.value })}
+            />
+            <label className="task-modal-label">Estatus:</label>
+            <select
+              className="task-modal-select"
+              value={editTaskForm.task_status}
+              onChange={(e) => setEditTaskForm({ ...editTaskForm, task_status: e.target.value })}
+            >
               <option value="Pendiente">Pendiente</option>
               <option value="En Progreso">En Progreso</option>
               <option value="Completado">Completado</option>
               <option value="Cancelado">Cancelado</option>
             </select>
-            <label style={{ display: 'block', marginBottom: '5px' }}>Due Date (Fecha Límite):</label>
-            <input type="date" value={editTaskForm.task_due_date || ''} onChange={(e) => setEditTaskForm({ ...editTaskForm, task_due_date: e.target.value })} style={{ width: '100%', padding: '8px', marginBottom: '20px', borderRadius: '4px', border: '1px solid #555', background: '#1e2128', color: 'white' }} />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-              <button onClick={closeEditTaskModal} style={{ padding: '8px 15px', background: '#555', border: 'none', color: 'white', borderRadius: '4px', cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={handleSaveUpdatedTask} style={{ padding: '8px 15px', background: '#4caf50', border: 'none', color: 'white', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>Guardar Cambios</button>
+            <label className="task-modal-label">Due Date (Fecha Límite):</label>
+            <input
+              type="date"
+              className="task-modal-input task-modal-input-last"
+              value={editTaskForm.task_due_date || ''}
+              onChange={(e) => setEditTaskForm({ ...editTaskForm, task_due_date: e.target.value })}
+            />
+            <div className="task-modal-actions">
+              <button onClick={closeEditTaskModal} className="modal-btn-cancel">Cancelar</button>
+              <button onClick={handleSaveUpdatedTask} className="modal-btn-update">Guardar Cambios</button>
             </div>
           </div>
         </div>
@@ -554,7 +573,7 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
       <div className="video-container">
 
         {/* REPRODUCTOR MULTIMEDIA SECUENCIAL */}
-        <div className="video-screen" style={{ backgroundColor: '#000', position: 'relative', overflow: 'hidden' }}>
+        <div className="video-screen">
           {activeTimelineViewId ? (
             views.map((view, idx) => {
               const isVisible = viewVisibility[view.views_pk] !== false;
@@ -570,21 +589,13 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
               return (
                 <div
                   key={view.views_pk}
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    opacity: opacityVal,
-                    zIndex: views.length - idx, // La primera view en tu lista se dibuja arriba
-                    pointerEvents: 'none'
-                  }}
+                  className="video-layer-wrapper"
+                  style={{ opacity: opacityVal, zIndex: views.length - idx }}
                 >
                   {isImg ? (
                     <img
                       src={`${API_BASE_URL}/${task.file_path}`}
-                      style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }}
+                      className="video-layer-img"
                       alt={task.task_name}
                     />
                   ) : (
@@ -598,39 +609,47 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
               );
             })
           ) : (
-            <div className="no-content-message" style={{ color: 'white', textAlign: 'center', width: '100%', paddingTop: '20%' }}>
+            <div className="no-content-message">
               Selecciona una vista con tareas para previsualizar
             </div>
           )}
         </div>
 
-
-
-        <div className="video-controls-centered" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '15px', padding: '10px 0' }}>
+        <div className="video-controls-centered">
           <button onClick={handleRewind} className="control-btn" title="Rebobinar">◀◀</button>
           <button onClick={togglePlay} className="control-btn play-main-btn">{isPlaying ? '⏸' : '▶'}</button>
           <button onClick={handleFastForward} className="control-btn" title="Adelantar">▶▶</button>
 
           {activeTimelineViewId && (
-            <span style={{ color: '#aaa', fontSize: '14px', marginLeft: '20px' }}>
+            <span className="timeline-time-display">
               <strong>{formatDuration(globalProgressMs / 1000)} / {formatDuration(totalDurationMs / 1000)}</strong>
             </span>
           )}
 
           {activeTimelineViewId && (
-            <Box sx={{ width: '200px', display: 'flex', alignItems: 'center', gap: 2, marginLeft: '20px' }}>
+            <Box className="timeline-zoom-box">
               <Slider
-                size="small" value={timelineScale} min={0.05} max={2} step={0.01} onChange={(e, newValue) => setTimelineScale(newValue)}
-                aria-label="Timeline Zoom" valueLabelDisplay="auto" valueLabelFormat={(value) => `${Math.round(value * 100)}%`}
-                sx={{ color: '#4a90e2' }}
+                size="small"
+                className="timeline-zoom-slider"
+                value={timelineScale}
+                min={0.05}
+                max={2}
+                step={0.01}
+                onChange={(e, newValue) => setTimelineScale(newValue)}
+                aria-label="Timeline Zoom"
+                valueLabelDisplay="auto"
+                valueLabelFormat={(value) => `${Math.round(value * 100)}%`}
               />
             </Box>
           )}
         </div>
 
         {/* TIMELINE VISUAL */}
-        <div className="timeline-task-tracks" style={{ display: 'flex', flexDirection: 'row', width: '100%', height: '100px', backgroundColor: '#111', marginBottom: '5px', overflowX: 'auto', overflowY: 'hidden', position: 'relative' }}>
-          <div className="timeline-inner-track" style={{ display: 'flex', flexDirection: 'row', height: '100%', minWidth: `${Math.max((totalDurationMs / 1000) * 5, 800) * timelineScale}px`, position: 'relative', transition: 'min-width 0.2s ease-out' }}>
+        <div className="timeline-task-tracks">
+          <div
+            className="timeline-inner-track"
+            style={{ minWidth: `${Math.max((totalDurationMs / 1000) * 5, 800) * timelineScale}px` }}
+          >
             {activeTimelineViewId ? (
               activeTasks.map((task, index) => {
                 const durationInSecs = parseDuration(task.tasks_duration);
@@ -641,13 +660,19 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
                 const canResize = !task.is_estatic && !isVideoFile;
 
                 const rawFileName = task.file_path ? task.file_path.split('/').pop() : 'Vacío';
-
-                // Calcular ancho proporcional al tiempo total
                 const widthPercent = totalDurationMs > 0 ? ((durationInSecs * 1000) / totalDurationMs) * 100 : 0;
+
+                const taskBlockClasses = [
+                  'timeline-task-block',
+                  isVideoFile ? 'is-video' : '',
+                  task.is_estatic ? 'is-static' : '',
+                  isCurrentlyPlaying ? 'is-playing' : ''
+                ].filter(Boolean).join(' ');
 
                 return (
                   <div
                     key={task.tasks_pk}
+                    className={taskBlockClasses}
                     title={`${task.task_name} (${task.tasks_duration})`}
                     draggable={!task.is_estatic}
                     onDragStart={(e) => {
@@ -656,42 +681,44 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
                     }}
                     onDragOver={onDragOverTask}
                     onDrop={(e) => onDropTask(e, task.tasks_pk)}
-                    style={{
-                      width: `${widthPercent}%`, minWidth: '30px', height: '100%',
-                      backgroundColor: task.is_estatic ? '#555' : (isVideoFile ? '#9b59b6' : '#2196F3'),
-                      borderRight: '1px solid #000', borderLeft: '1px solid #000',
-                      border: isCurrentlyPlaying ? '3px solid #ffeb3b' : '1px solid #000',
-                      position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '12px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', userSelect: 'none', cursor: task.is_estatic ? 'not-allowed' : 'grab', flexShrink: 0
-                    }}>
-
+                    style={{ width: `${widthPercent}%` }}
+                  >
                     {isImgFile && (
-                      <img src={`${API_BASE_URL}/${task.file_path}`} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.4, zIndex: 0 }} alt="thumb" />
+                      <img
+                        src={`${API_BASE_URL}/${task.file_path}`}
+                        className="timeline-task-thumb"
+                        alt="thumb"
+                      />
                     )}
 
-                    <span style={{ zIndex: 1, display: 'flex', alignItems: 'center', gap: '5px', padding: '0 5px' }}>
+                    <span className="timeline-task-label">
                       {task.is_estatic && <span>🔒</span>}
                       {isVideoFile && <span>🎬</span>}
-                      <span style={{ textOverflow: 'ellipsis', overflow: 'hidden' }}>{rawFileName}</span>
+                      <span className="timeline-task-filename">{rawFileName}</span>
                     </span>
 
                     {canResize && (
-                      <div onMouseDown={(e) => handleDragStart(e, task)} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '8px', backgroundColor: 'rgba(255, 255, 255, 0.6)', cursor: 'ew-resize', zIndex: 2 }} />
+                      <div
+                        className="timeline-resize-handle"
+                        onMouseDown={(e) => handleDragStart(e, task)}
+                      />
                     )}
                   </div>
                 );
               })
-            ) : (<div style={{ color: '#555', fontSize: '12px', width: '100%', textAlign: 'center', lineHeight: '40px' }}>Selecciona una vista para ver su pipeline</div>)}
+            ) : (
+              <div className="timeline-empty-message">Selecciona una vista para ver su pipeline</div>
+            )}
           </div>
         </div>
 
-        <div className="video-controls-bar" style={{ padding: '10px', width: '100%' }}>
-          <div className="progress-bar-container" style={{ width: '100%' }}>
+        <div className="video-controls-bar">
+          <div className="progress-bar-container">
             <input
               type="range" min="0" max="100"
               value={totalDurationMs > 0 ? (globalProgressMs / totalDurationMs) * 100 : 0}
               onChange={handleProgressChange}
-              className="progress-bar" style={{ width: '100%', cursor: 'pointer' }}
+              className="progress-bar"
             />
           </div>
         </div>
@@ -727,7 +754,6 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
         toggleViewVisibility={toggleViewVisibility}
         viewOpacities={viewOpacities}
         handleViewOpacityChange={handleViewOpacityChange}
-
       />
     </div>
   );

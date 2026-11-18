@@ -46,11 +46,9 @@ function Login() {
       const tokenPayload = JSON.parse(atob(token.split('.')[1]));
       const userRole = tokenPayload.role; //
 
-      //Guardamos el rol en local storage para validar permisos en otras pantallas
       localStorage.setItem('user_role', userRole);
       console.log('TOKEN FASTAPI GUARDADO. ROL:', userRole);
 
-      //Redireccion a cada uno
       if (userRole === 'admin') {
         // ADMIN
         navigate('/dashboard', { replace: true });
