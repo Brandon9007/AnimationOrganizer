@@ -34,6 +34,8 @@ class TasksClass(BaseModel):
     tasks_order: int
     tasks_duration:str
     is_estatic:bool
+    file_path: Optional[str] = None
+
     is_active: bool
     
 # Conexion a la base de datos 
@@ -48,7 +50,6 @@ async def get_db():
 #GET
 @router.get("/tasks")
 def get_tasks(db: Session = Depends(get_db)):
-
     tasks = db.query(Tasks).all()
     
     result = []
@@ -65,11 +66,13 @@ def get_tasks(db: Session = Depends(get_db)):
             "tasks_duration": task.tasks_duration,
             "tasks_order": task.tasks_order,
             "is_active": task.is_active,
+            "file_path": task.file_path, # <-- ESTO FALTABA PARA QUE REACT VEA EL ARCHIVO
             "views_pk": task.group_tasks_views[0].views_pk if task.group_tasks_views else None 
         }
         result.append(task_dict)
         
     return {"data": result}
+
 
 # POST
 @router.post("/tasks")
@@ -107,35 +110,6 @@ def create_task(
     return {
         "message": "Task created successfully",
         "data": new_task
-    }
-
-# POST BULK
-@router.post("/tasks/bulk")
-def create_tasks_bulk(
-    tasks_list: List[TasksClass],
-    db: Session = Depends(get_db)
-):
-    tasks_to_insert = [
-        Tasks(
-        task_name=task.task_name,
-        task_description=task.task_description,
-        task_status=task.task_status,
-        task_created_at=task.task_created_at,
-        task_updated_at=task.task_updated_at,
-        task_due_date=task.task_due_date,
-        tasks_order = task.tasks_order,
-        tasks_duration = task.tasks_duration,
-        is_estatic = task.is_estatic,
-        is_active=task.is_active,
-        )
-        for task in tasks_list
-    ]
-
-    db.add_all(tasks_to_insert)
-    db.commit()
-
-    return {
-        "message": f"{len(tasks_to_insert)} tasks inserted"
     }
 
 # PUT

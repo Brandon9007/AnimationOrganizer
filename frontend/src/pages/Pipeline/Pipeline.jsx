@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import ViewsSection from './ViewsSection';
 import './Pipeline.css';
 
@@ -20,14 +20,44 @@ const formatDuration = (totalSeconds) => {
   return `${h}:${m}:${s}`;
 };
 
+
+
 // URL de tu Backend
 const API_BASE_URL = 'http://localhost:8000';
+
+function LayerVideo({ src, localTimeMs, isPlaying }) {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!ref.current) return;
+    const targetTime = localTimeMs / 1000;
+    if (Math.abs(ref.current.currentTime - targetTime) > 0.4) {
+      ref.current.currentTime = targetTime;
+    }
+    if (isPlaying && ref.current.paused) {
+      ref.current.play().catch(() => { });
+    } else if (!isPlaying && !ref.current.paused) {
+      ref.current.pause();
+    }
+  }, [localTimeMs, isPlaying, src]);
+
+  return (
+    <video
+      ref={ref}
+      src={src}
+      className="video-element"
+      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+      muted={false}
+    />
+  );
+}
+
+
 
 function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [videoDuration, setVideoDuration] = useState(300);
+  const [globalProgressMs, setGlobalProgressMs] = useState(0);
   const [timelineScale, setTimelineScale] = useState(1);
 
   const [views, setViews] = useState([]);
@@ -50,13 +80,9 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
 
   const [taskComments, setTaskComments] = useState({});
 
-  // --- LÓGICA DE PLAYLIST (SECUENCIA) ---
-  const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
-
   const fetchTasks = async () => {
     try {
-
-      const tasksRes = await fetch(`http://localhost:8000/tasks`);
+      const tasksRes = await fetch(`${API_BASE_URL}/tasks`);
       if (tasksRes.ok) {
         const tasksResult = await tasksRes.json();
         setTasks(tasksResult.data || tasksResult);
@@ -67,7 +93,7 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
   useEffect(() => {
     const fetchViews = async () => {
       try {
-        const viewsRes = await fetch(`http://localhost:8000/views`);
+        const viewsRes = await fetch(`${API_BASE_URL}/views`);
         if (viewsRes.ok) {
           const viewsResult = await viewsRes.json();
           const sortedViews = (viewsResult.data || viewsResult).sort((a, b) => a.views_order - b.views_order);
@@ -80,84 +106,127 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
     fetchTasks();
   }, []);
 
-  // Reiniciar la playlist cuando se cambia de vista
+  // Reiniciar el reproductor cuando se cambia de vista
   useEffect(() => {
-    setCurrentTaskIndex(0);
+    setGlobalProgressMs(0);
     setIsPlaying(false);
-    setProgress(0);
   }, [activeTimelineViewId]);
 
   // Lista de tareas ordenadas activas para la línea de tiempo
-  const activeTasks = activeTimelineViewId
-    ? tasks.filter(t => t.views_pk === activeTimelineViewId && t.is_active !== false).sort((a, b) => a.tasks_order - b.tasks_order)
-    : [];
+  const activeTasks = useMemo(() => {
+    return activeTimelineViewId
+      ? tasks.filter(t => t.views_pk === activeTimelineViewId && t.is_active !== false).sort((a, b) => a.tasks_order - b.tasks_order)
+      : [];
+  }, [tasks, activeTimelineViewId]);
 
-  const totalDurationSeconds = activeTasks.reduce((acc, task) => acc + parseDuration(task.tasks_duration), 0);
-  const currentTask = activeTasks[currentTaskIndex];
+  const getTaskAtTime = (viewId, timeMs) => {
+    const vTasks = tasks
+      .filter(t => t.views_pk === viewId && t.is_active !== false)
+      .sort((a, b) => a.tasks_order - b.tasks_order);
 
-  // Verifica si el archivo es imagen (basado en la extensión guardada en file_path)
-  const isImageMedia = currentTask?.file_path?.match(/\.(jpeg|jpg|gif|png)$/i);
-
-  // Lógica de avance automático para imágenes estáticas
-  useEffect(() => {
-    if (isPlaying && currentTask && isImageMedia) {
-      const durationMs = parseDuration(currentTask.tasks_duration) * 1000;
-      const timer = setTimeout(() => {
-        handleNextMedia();
-      }, durationMs);
-      return () => clearTimeout(timer);
+    let accMs = 0;
+    for (let i = 0; i < vTasks.length; i++) {
+      const durMs = parseDuration(vTasks[i].tasks_duration) * 1000;
+      if (timeMs >= accMs && timeMs < accMs + durMs) {
+        return { task: vTasks[i], localMs: timeMs - accMs };
+      }
+      accMs += durMs;
     }
-  }, [isPlaying, currentTask, isImageMedia, currentTaskIndex]);
-
-  const handleNextMedia = useCallback(() => {
-    if (currentTaskIndex < activeTasks.length - 1) {
-      setCurrentTaskIndex(prev => prev + 1);
-      setProgress(0);
-    } else {
-      setIsPlaying(false);
-      setProgress(0);
-    }
-  }, [currentTaskIndex, activeTasks.length]);
-
-  useEffect(() => {
-    if (isPlaying && currentTask && isImageMedia) {
-      const durationMs = parseDuration(currentTask.tasks_duration) * 1000;
-      const timer = setTimeout(() => {
-        handleNextMedia();
-      }, durationMs);
-      return () => clearTimeout(timer);
-    }
-  }, [isPlaying, currentTask, isImageMedia, currentTaskIndex, handleNextMedia]);
-
-
-
-  const handlePrevMedia = () => {
-    if (currentTaskIndex > 0) {
-      setCurrentTaskIndex(prev => prev - 1);
-      setProgress(0);
-    }
+    return null; // Si esta view es más corta que la seleccionada, no muestra nada al terminar
   };
 
-  // Controles de Video Adaptados a Secuencia
-  const togglePlay = () => {
-    if (currentTask && !isImageMedia && videoRef.current) {
-      if (videoRef.current.paused) {
-        videoRef.current.play();
-        setIsPlaying(true);
-      } else {
-        videoRef.current.pause();
-        setIsPlaying(false);
+
+  // Calcular métricas de la línea de tiempo
+  const { totalDurationMs, currentTaskIndex, currentTask, localTaskProgressMs } = useMemo(() => {
+    let totalMs = 0;
+    let activeIdx = 0;
+    let localProgMs = 0;
+
+    for (let i = 0; i < activeTasks.length; i++) {
+      const taskDurationMs = parseDuration(activeTasks[i].tasks_duration) * 1000;
+      if (globalProgressMs >= totalMs && globalProgressMs < totalMs + taskDurationMs) {
+        activeIdx = i;
+        localProgMs = globalProgressMs - totalMs;
       }
-    } else if (currentTask && isImageMedia) {
-      setIsPlaying(!isPlaying); // Alterna el temporizador de imagen
+      totalMs += taskDurationMs;
     }
+
+    // Manejar el final de la secuencia
+    if (globalProgressMs >= totalMs && activeTasks.length > 0) {
+      activeIdx = activeTasks.length - 1;
+      localProgMs = parseDuration(activeTasks[activeTasks.length - 1].tasks_duration) * 1000;
+    }
+
+    return {
+      totalDurationMs: totalMs,
+      currentTaskIndex: activeIdx,
+      currentTask: activeTasks[activeIdx],
+      localTaskProgressMs: localProgMs
+    };
+  }, [activeTasks, globalProgressMs]);
+
+  // Variables booleanas para identificar el tipo de clip actual
+  const hasMedia = !!currentTask?.file_path;
+  //const isImageMedia = hasMedia && currentTask.file_path.match(/\.(jpeg|jpg|gif|png)$/i);
+  const isVideoMedia = hasMedia && currentTask.file_path.match(/\.(mp4|webm|ogg|mov)$/i);
+
+  // --- MOTOR DEL REPRODUCTOR VIRTUAL GLOBAL ---
+  useEffect(() => {
+    let interval;
+    if (isPlaying && totalDurationMs > 0) {
+      const updateInterval = 50;
+
+      interval = setInterval(() => {
+        setGlobalProgressMs(prev => {
+          const nextVal = prev + updateInterval;
+          if (nextVal >= totalDurationMs) {
+            setIsPlaying(false);
+            return totalDurationMs;
+          }
+          return nextVal;
+        });
+      }, updateInterval);
+    }
+    return () => clearInterval(interval);
+  }, [isPlaying, totalDurationMs]);
+
+  // Sincronizar video nativo con el tiempo local
+  useEffect(() => {
+    if (currentTask && isVideoMedia && videoRef.current) {
+      const targetTime = localTaskProgressMs / 1000;
+
+      // Si el video está muy desfasado (por un seek o cambio de clip), actualizarlo
+      if (Math.abs(videoRef.current.currentTime - targetTime) > 0.5) {
+        videoRef.current.currentTime = targetTime;
+      }
+
+      if (isPlaying && videoRef.current.paused) {
+        videoRef.current.play().catch(e => console.log("Autoplay prevent:", e));
+      } else if (!isPlaying && !videoRef.current.paused) {
+        videoRef.current.pause();
+      }
+    }
+  }, [currentTaskIndex, isPlaying, isVideoMedia, currentTask, localTaskProgressMs]);
+
+  const togglePlay = () => {
+    if (activeTasks.length === 0) return;
+    if (!isPlaying && globalProgressMs >= totalDurationMs) {
+      setGlobalProgressMs(0); // Reiniciar si terminó
+    }
+    setIsPlaying(!isPlaying);
   };
 
   const handleProgressChange = (e) => {
-    if (!isImageMedia && videoRef.current) {
-      videoRef.current.currentTime = (e.target.value / 100) * videoRef.current.duration;
-    }
-    setProgress(e.target.value);
+    const newPercentage = parseFloat(e.target.value);
+    setGlobalProgressMs((newPercentage / 100) * totalDurationMs);
+  };
+
+  const handleFastForward = () => {
+    setGlobalProgressMs(prev => Math.min(totalDurationMs, prev + 5000));
+  };
+
+  const handleRewind = () => {
+    setGlobalProgressMs(prev => Math.max(0, prev - 5000));
   };
 
   // --- Task Resizing Logic ---
@@ -174,8 +243,12 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
     const handleMouseMove = (moveEvent) => {
       if (!dragRef.current.isDragging) return;
       const deltaX = moveEvent.clientX - dragRef.current.startX;
-      const deltaSecs = (deltaX / dragRef.current.timelineWidth) * videoDuration;
-      let newDur = Math.max(2, dragRef.current.startDur + deltaSecs);
+      // Calcula duración total visible para proporción de resize
+      const visibleDur = Math.max(totalDurationMs / 1000, 300);
+      const deltaSecs = (deltaX / dragRef.current.timelineWidth) * visibleDur;
+
+      // MINIMUM DURATION = 2 SECONDS
+      let newDur = Math.max(1, dragRef.current.startDur + deltaSecs);
       setTasks(prev => prev.map(t => t.tasks_pk === dragRef.current.taskId ? { ...t, tasks_duration: formatDuration(newDur) } : t));
     };
 
@@ -186,8 +259,10 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
       window.removeEventListener('mouseup', handleMouseUp);
 
       const deltaX = upEvent.clientX - dragRef.current.startX;
-      const deltaSecs = (deltaX / dragRef.current.timelineWidth) * videoDuration;
-      let finalDur = Math.max(2, dragRef.current.startDur + deltaSecs);
+      const visibleDur = Math.max(totalDurationMs / 1000, 300);
+      const deltaSecs = (deltaX / dragRef.current.timelineWidth) * visibleDur;
+
+      let finalDur = Math.max(1, dragRef.current.startDur + deltaSecs);
       const todayDate = new Date().toISOString().split('T')[0];
 
       const updatedTask = {
@@ -200,7 +275,7 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
       };
 
       try {
-        await fetch(`http://localhost:8000/tasks/${dragRef.current.taskId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedTask) });
+        await fetch(`${API_BASE_URL}/tasks/${dragRef.current.taskId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedTask) });
       } catch (error) { console.error('Error guardando duración:', error); }
     };
 
@@ -233,8 +308,8 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
     const taskB = { ...currentTasks[targetIndex], task_updated_at: todayDate };
 
     try {
-      await fetch(`http://localhost:8000/tasks/${taskA.tasks_pk}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(taskA) });
-      await fetch(`http://localhost:8000/tasks/${taskB.tasks_pk}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(taskB) });
+      await fetch(`${API_BASE_URL}/tasks/${taskA.tasks_pk}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(taskA) });
+      await fetch(`${API_BASE_URL}/tasks/${taskB.tasks_pk}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(taskB) });
     } catch (error) { console.error("Error updating order:", error); }
   };
 
@@ -261,8 +336,8 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
     const viewB = { ...currentViews[targetIndex] };
 
     try {
-      await fetch(`http://localhost:8000/views/${viewA.views_pk}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(viewA) });
-      await fetch(`http://localhost:8000/views/${viewB.views_pk}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(viewB) });
+      await fetch(`${API_BASE_URL}/views/${viewA.views_pk}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(viewA) });
+      await fetch(`${API_BASE_URL}/views/${viewB.views_pk}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(viewB) });
     } catch (error) { console.error("Error updating view order:", error); }
   };
 
@@ -271,7 +346,7 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
     const finalViewName = newViewNameInput.trim() !== '' ? newViewNameInput : `view_${viewCounter}`;
     const newViewData = { views_name: finalViewName, views_order: views.length + 1, is_active: true };
     try {
-      const response = await fetch('http://localhost:8000/views', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newViewData) });
+      const response = await fetch(`${API_BASE_URL}/views`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newViewData) });
       if (response.ok) {
         const result = await response.json();
         setViews([...views, result.data || result]);
@@ -285,7 +360,7 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
     if (!updatedName) return;
     const updatedViewData = { views_pk: viewId, views_name: updatedName, views_order: currentOrder, is_active: true };
     try {
-      const response = await fetch(`http://localhost:8000/views/${viewId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedViewData) });
+      const response = await fetch(`${API_BASE_URL}/views/${viewId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedViewData) });
       if (response.ok) setViews(views.map(v => v.views_pk === viewId ? { ...v, views_name: updatedName } : v));
     } catch (error) { console.error('Error:', error); }
   };
@@ -295,7 +370,7 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
     if (tieneTareas) { alert("⚠️ No puedes borrar esta vista porque tiene tareas enlazadas. Borra las tareas primero."); return; }
     if (!window.confirm("¿Seguro que deseas eliminar esta vista?")) return;
     try {
-      const response = await fetch(`http://localhost:8000/views/${viewId}`, { method: 'DELETE' });
+      const response = await fetch(`${API_BASE_URL}/views/${viewId}`, { method: 'DELETE' });
       if (response.ok) setViews(views.filter(v => v.views_pk !== viewId));
     } catch (error) { console.error('Error:', error); }
   };
@@ -321,18 +396,18 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
       task_updated_at: todayDate,
       task_due_date: taskForm.task_due_date || todayDate,
       tasks_order: tasks.filter(t => t.views_pk === targetViewId).length + 1,
-      tasks_duration: taskForm.is_estatic ? "00:00:10" : "00:01:00",
+      tasks_duration: taskForm.is_estatic ? "00:00:01" : "00:01:00", // Start static tasks at 2 sec min
       is_estatic: taskForm.is_estatic,
       is_active: true
     };
 
     try {
-      const responseTask = await fetch('http://localhost:8000/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newTaskData) });
+      const responseTask = await fetch(`${API_BASE_URL}/tasks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newTaskData) });
       if (responseTask.ok) {
         const resultTask = await responseTask.json();
         const createdTask = resultTask.data || newTaskData;
         const newRelationData = { groups_tasks_views_name: `${createdTask.task_name}_view_${targetViewId}`, is_active: true, task_pk: createdTask.tasks_pk, views_pk: targetViewId };
-        const responseRelation = await fetch('http://localhost:8000/groups_tasks_views', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newRelationData) });
+        const responseRelation = await fetch(`${API_BASE_URL}/groups_tasks_views`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newRelationData) });
 
         if (responseRelation.ok) { setTasks([...tasks, { ...createdTask, views_pk: targetViewId }]); closeTaskModal(); }
         else { alert("La tarea se creó, pero falló al enlazarla."); }
@@ -346,7 +421,7 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
     const updatedTaskData = { ...editTaskForm, task_updated_at: todayDate };
 
     try {
-      const response = await fetch(`http://localhost:8000/tasks/${editTaskForm.tasks_pk}`, {
+      const response = await fetch(`${API_BASE_URL}/tasks/${editTaskForm.tasks_pk}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedTaskData)
       });
       if (response.ok) {
@@ -359,7 +434,7 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
   const handleToggleLock = async (task) => {
     const updatedTaskData = { ...task, is_estatic: !task.is_estatic };
     try {
-      const response = await fetch(`http://localhost:8000/tasks/${task.tasks_pk}`, {
+      const response = await fetch(`${API_BASE_URL}/tasks/${task.tasks_pk}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedTaskData)
       });
       if (response.ok) setTasks(tasks.map(t => t.tasks_pk === task.tasks_pk ? updatedTaskData : t));
@@ -369,7 +444,7 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
   const handleDeleteTask = async (taskId) => {
     if (!window.confirm("¿Seguro que deseas eliminar esta tarea?")) return;
     try {
-      const response = await fetch(`http://localhost:8000/tasks/${taskId}`, { method: 'DELETE' });
+      const response = await fetch(`${API_BASE_URL}/tasks/${taskId}`, { method: 'DELETE' });
       if (response.ok) setTasks(tasks.filter(t => t.tasks_pk !== taskId));
     } catch (error) { console.error('Error:', error); }
   };
@@ -381,7 +456,7 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
     const updatedTaskData = { ...task, task_status: newStatus, task_updated_at: todayDate };
 
     try {
-      const response = await fetch(`http://localhost:8000/tasks/${task.tasks_pk}`, {
+      const response = await fetch(`${API_BASE_URL}/tasks/${task.tasks_pk}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedTaskData)
       });
       if (response.ok) {
@@ -392,7 +467,7 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
 
   const fetchTaskComments = async (taskId) => {
     try {
-      const res = await fetch(`http://localhost:8000/tasks/${taskId}/comments`);
+      const res = await fetch(`${API_BASE_URL}/tasks/${taskId}/comments`);
       if (res.ok) {
         const result = await res.json();
         setTaskComments(prev => ({ ...prev, [taskId]: result.data || result }));
@@ -403,17 +478,34 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
   const handleAddComment = async (taskId, text, userRole) => {
     const commentData = { comments_description: text, created_by: userRole || 'admin', tasks_fk: taskId };
     try {
-      const response = await fetch('http://localhost:8000/comments', {
+      const response = await fetch(`${API_BASE_URL}/comments`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(commentData)
       });
       if (response.ok) { fetchTaskComments(taskId); }
     } catch (error) { console.error('Error posting comment:', error); }
   };
 
+  const [viewVisibility, setViewVisibility] = useState({});
+  const [viewOpacities, setViewOpacities] = useState({});
+
+  const toggleViewVisibility = (viewId) => {
+    setViewVisibility(prev => ({
+      ...prev,
+      [viewId]: prev[viewId] === undefined ? false : !prev[viewId]
+    }));
+  };
+
+  const handleViewOpacityChange = (viewId, newOpacity) => {
+    setViewOpacities(prev => ({
+      ...prev,
+      [viewId]: newOpacity
+    }));
+  };
+
   return (
     <div className="pipeline-container">
 
-      {/* Modal: CREAR TAREA */}
+      {/* Modales... */}
       {isModalOpen && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0, 0, 0, 0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
           <div style={{ background: '#2c303a', padding: '25px', borderRadius: '8px', width: '400px', color: 'white', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }}>
@@ -432,7 +524,6 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
         </div>
       )}
 
-      {/* Modal: EDITAR TAREA */}
       {editTaskForm && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0, 0, 0, 0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999 }}>
           <div style={{ background: '#2c303a', padding: '25px', borderRadius: '8px', width: '400px', color: 'white', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }}>
@@ -463,44 +554,66 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
       <div className="video-container">
 
         {/* REPRODUCTOR MULTIMEDIA SECUENCIAL */}
-        <div className="video-screen" style={{ backgroundColor: '#000', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-          {currentTask && currentTask.file_path ? (
-            isImageMedia ? (
-              <img src={`${API_BASE_URL}/${currentTask.file_path}`} style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }} alt="preview" />
-            ) : (
+        <div className="video-screen" style={{ backgroundColor: '#000', position: 'relative', overflow: 'hidden' }}>
+          {activeTimelineViewId ? (
+            views.map((view, idx) => {
+              const isVisible = viewVisibility[view.views_pk] !== false;
+              if (!isVisible) return null;
 
-              <video
-                ref={videoRef}
-                src={`${API_BASE_URL}/${currentTask.file_path}`}
-                className="video-element"
-                onLoadedMetadata={(e) => setVideoDuration(e.target.duration)} // <--- SOLUCIÓN AL WARNING 1
-                onTimeUpdate={() => {
-                  if (videoRef.current && videoRef.current.duration) setProgress((videoRef.current.currentTime / videoRef.current.duration) * 100);
-                }}
-                onEnded={handleNextMedia}
-                autoPlay={isPlaying}
-              />
-            )
+              const layerData = getTaskAtTime(view.views_pk, globalProgressMs);
+              if (!layerData || !layerData.task?.file_path) return null;
+
+              const { task, localMs } = layerData;
+              const isImg = task.file_path.match(/\.(jpeg|jpg|gif|png)$/i);
+              const opacityVal = (viewOpacities[view.views_pk] ?? 100) / 100;
+
+              return (
+                <div
+                  key={view.views_pk}
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    opacity: opacityVal,
+                    zIndex: views.length - idx, // La primera view en tu lista se dibuja arriba
+                    pointerEvents: 'none'
+                  }}
+                >
+                  {isImg ? (
+                    <img
+                      src={`${API_BASE_URL}/${task.file_path}`}
+                      style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }}
+                      alt={task.task_name}
+                    />
+                  ) : (
+                    <LayerVideo
+                      src={`${API_BASE_URL}/${task.file_path}`}
+                      localTimeMs={localMs}
+                      isPlaying={isPlaying}
+                    />
+                  )}
+                </div>
+              );
+            })
           ) : (
-            <div className="no-content-message" style={{ color: 'white' }}>
-              {activeTasks.length > 0 ? "Tarea actual no tiene archivo multimedia subido" : "Selecciona una vista con tareas para previsualizar"}
+            <div className="no-content-message" style={{ color: 'white', textAlign: 'center', width: '100%', paddingTop: '20%' }}>
+              Selecciona una vista con tareas para previsualizar
             </div>
           )}
         </div>
 
+
+
         <div className="video-controls-centered" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '15px', padding: '10px 0' }}>
-          <button onClick={handlePrevMedia} className="control-btn" title="Tarea Anterior">◀◀</button>
+          <button onClick={handleRewind} className="control-btn" title="Rebobinar">◀◀</button>
           <button onClick={togglePlay} className="control-btn play-main-btn">{isPlaying ? '⏸' : '▶'}</button>
-          <button onClick={handleNextMedia} className="control-btn" title="Siguiente Tarea">▶▶</button>
+          <button onClick={handleFastForward} className="control-btn" title="Adelantar">▶▶</button>
 
           {activeTimelineViewId && (
             <span style={{ color: '#aaa', fontSize: '14px', marginLeft: '20px' }}>
-              <strong>{formatDuration(totalDurationSeconds)}</strong>
-              {activeTasks.length > 0 && (
-                <span style={{ marginLeft: '10px', fontSize: '12px', color: '#4a90e2' }}>
-                  (Reproduciendo: {currentTaskIndex + 1}/{activeTasks.length})
-                </span>
-              )}
+              <strong>{formatDuration(globalProgressMs / 1000)} / {formatDuration(totalDurationMs / 1000)}</strong>
             </span>
           )}
 
@@ -515,14 +628,22 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
           )}
         </div>
 
-        {/* TIMELINE VISUAL (Con Borde de Selección Amarillo) */}
+        {/* TIMELINE VISUAL */}
         <div className="timeline-task-tracks" style={{ display: 'flex', flexDirection: 'row', width: '100%', height: '100px', backgroundColor: '#111', marginBottom: '5px', overflowX: 'auto', overflowY: 'hidden', position: 'relative' }}>
-          <div className="timeline-inner-track" style={{ display: 'flex', flexDirection: 'row', height: '100%', minWidth: `${Math.max(videoDuration * 5, 800) * timelineScale}px`, position: 'relative', transition: 'min-width 0.2s ease-out' }}>
+          <div className="timeline-inner-track" style={{ display: 'flex', flexDirection: 'row', height: '100%', minWidth: `${Math.max((totalDurationMs / 1000) * 5, 800) * timelineScale}px`, position: 'relative', transition: 'min-width 0.2s ease-out' }}>
             {activeTimelineViewId ? (
               activeTasks.map((task, index) => {
                 const durationInSecs = parseDuration(task.tasks_duration);
-                // Borde amarillo si es la tarea reproduciéndose
                 const isCurrentlyPlaying = index === currentTaskIndex;
+
+                const isVideoFile = task.file_path && task.file_path.match(/\.(mp4|webm|ogg|mov)$/i);
+                const isImgFile = task.file_path && task.file_path.match(/\.(jpeg|jpg|gif|png)$/i);
+                const canResize = !task.is_estatic && !isVideoFile;
+
+                const rawFileName = task.file_path ? task.file_path.split('/').pop() : 'Vacío';
+
+                // Calcular ancho proporcional al tiempo total
+                const widthPercent = totalDurationMs > 0 ? ((durationInSecs * 1000) / totalDurationMs) * 100 : 0;
 
                 return (
                   <div
@@ -536,17 +657,26 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
                     onDragOver={onDragOverTask}
                     onDrop={(e) => onDropTask(e, task.tasks_pk)}
                     style={{
-                      width: `${(durationInSecs / (videoDuration || 300)) * 100}%`, minWidth: '30px', height: '100%',
-                      backgroundColor: task.is_estatic ? '#555' : '#2196F3',
+                      width: `${widthPercent}%`, minWidth: '30px', height: '100%',
+                      backgroundColor: task.is_estatic ? '#555' : (isVideoFile ? '#9b59b6' : '#2196F3'),
                       borderRight: '1px solid #000', borderLeft: '1px solid #000',
                       border: isCurrentlyPlaying ? '3px solid #ffeb3b' : '1px solid #000',
                       position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: '12px', fontWeight: 'bold', color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', userSelect: 'none', cursor: task.is_estatic ? 'not-allowed' : 'grab', flexShrink: 0
                     }}>
-                    {task.is_estatic && <span style={{ marginRight: '5px' }}>🔒</span>}
-                    {task.task_name}
-                    {!task.is_estatic && (
-                      <div onMouseDown={(e) => handleDragStart(e, task)} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '8px', backgroundColor: 'rgba(255, 255, 255, 0.6)', cursor: 'ew-resize' }} />
+
+                    {isImgFile && (
+                      <img src={`${API_BASE_URL}/${task.file_path}`} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.4, zIndex: 0 }} alt="thumb" />
+                    )}
+
+                    <span style={{ zIndex: 1, display: 'flex', alignItems: 'center', gap: '5px', padding: '0 5px' }}>
+                      {task.is_estatic && <span>🔒</span>}
+                      {isVideoFile && <span>🎬</span>}
+                      <span style={{ textOverflow: 'ellipsis', overflow: 'hidden' }}>{rawFileName}</span>
+                    </span>
+
+                    {canResize && (
+                      <div onMouseDown={(e) => handleDragStart(e, task)} style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '8px', backgroundColor: 'rgba(255, 255, 255, 0.6)', cursor: 'ew-resize', zIndex: 2 }} />
                     )}
                   </div>
                 );
@@ -557,7 +687,12 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
 
         <div className="video-controls-bar" style={{ padding: '10px', width: '100%' }}>
           <div className="progress-bar-container" style={{ width: '100%' }}>
-            <input type="range" min="0" max="100" value={progress || 0} onChange={handleProgressChange} className="progress-bar" style={{ width: '100%', cursor: 'pointer' }} />
+            <input
+              type="range" min="0" max="100"
+              value={totalDurationMs > 0 ? (globalProgressMs / totalDurationMs) * 100 : 0}
+              onChange={handleProgressChange}
+              className="progress-bar" style={{ width: '100%', cursor: 'pointer' }}
+            />
           </div>
         </div>
       </div>
@@ -587,7 +722,12 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
         fetchTaskComments={fetchTaskComments}
         handleAddComment={handleAddComment}
         currentUserRole={userRole}
-        fetchTasks={fetchTasks} // Se pasa hacia abajo para refrescar tareas al subir archivo
+        fetchTasks={fetchTasks}
+        viewVisibility={viewVisibility}
+        toggleViewVisibility={toggleViewVisibility}
+        viewOpacities={viewOpacities}
+        handleViewOpacityChange={handleViewOpacityChange}
+
       />
     </div>
   );
