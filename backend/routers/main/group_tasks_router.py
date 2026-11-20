@@ -26,6 +26,12 @@ class GroupTasksClass(BaseModel):
     is_active: bool
     tasks_pk: int
     user_pk: int
+
+class GroupTasksCreate(BaseModel):
+    group_tasks_name: str
+    is_active: bool 
+    task_pk: int
+    user_pk: int
     
 # Conexion a la base de datos 
 async def get_db():
@@ -50,25 +56,24 @@ async def obtener_groups_tasks(db: Session = Depends(get_db)):
 # POST
 @router.post("/groups_tasks")
 def create_group_task(
-    group_task_data: GroupTasksClass,
+    data: GroupTasksCreate,
     db: Session = Depends(get_db)
 ):
-    existing_group_task = db.query(GroupTasks).filter(
-        GroupTasks.groups_tasks_name == group_task_data.groups_tasks_name
+    existing = db.query(GroupTasks).filter(
+        GroupTasks.group_tasks_name == data.group_tasks_name
     ).first()
 
-    if existing_group_task:
+    if existing:
         raise HTTPException(
             status_code=400,
             detail="Group Task name already exists"
         )
 
     new_group_task = GroupTasks(
-        groups_tasks_pk=group_task_data.groups_tasks_pk,
-        groups_tasks_name=group_task_data.groups_tasks_name,
-        is_active=group_task_data.is_active,
-        tasks_pk=group_task_data.tasks_pk,
-        user_pk=group_task_data.user_pk
+        group_tasks_name=data.group_tasks_name,
+        is_active=data.is_active,
+        task_pk=data.task_pk,
+        user_pk=data.user_pk
     )
 
     db.add(new_group_task)
