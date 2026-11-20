@@ -35,11 +35,11 @@ function ViewsSection({
   currentUserRole,
   fetchTasks,
 
-  // Nuevas props para visibilidad y opacidad
   viewVisibility,
   toggleViewVisibility,
   viewOpacities,
-  handleViewOpacityChange
+  handleViewOpacityChange,
+  currentUsername
 }) {
   return (
     <div className="views-section-container">
@@ -173,6 +173,7 @@ function ViewsSection({
                         handleAddComment={handleAddComment}
                         currentUserRole={currentUserRole}
                         fetchTasks={fetchTasks}
+                        currentUsername={currentUsername}
                       />
                     </div>
                   )}

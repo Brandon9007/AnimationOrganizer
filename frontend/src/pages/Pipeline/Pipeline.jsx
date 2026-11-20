@@ -5,6 +5,9 @@ import './Pipeline.css';
 import Box from '@mui/material/Box';
 import Slider from '@mui/material/Slider';
 
+
+
+
 // Utilities
 const parseDuration = (durStr) => {
   if (!durStr) return 60;
@@ -50,6 +53,7 @@ function LayerVideo({ src, localTimeMs, isPlaying }) {
 }
 
 function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
+  const currentUsername = localStorage.getItem('user_name') || userRole;
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [globalProgressMs, setGlobalProgressMs] = useState(0);
@@ -461,14 +465,36 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
     } catch (error) { console.error('Error fetching comments:', error); }
   };
 
-  const handleAddComment = async (taskId, text, userRole) => {
-    const commentData = { comments_description: text, created_by: userRole || 'admin', tasks_fk: taskId };
+
+
+const handleAddComment = async (taskId, text) => {
+    const todayDate = new Date().toISOString().split('T')[0];
+
+    const commentData = {
+      comments_description: text,
+      comments_created_at: todayDate,
+      comments_updated_at: todayDate,
+      created_by: currentUsername,
+      tasks_fk: taskId,
+      is_active: true
+    };
+
     try {
       const response = await fetch(`${API_BASE_URL}/comments`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(commentData)
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(commentData)
       });
-      if (response.ok) { fetchTaskComments(taskId); }
-    } catch (error) { console.error('Error posting comment:', error); }
+
+      if (response.ok) {
+        fetchTaskComments(taskId);
+      } else {
+        const errorDetail = await response.json();
+        console.error("Error al guardar comentario:", errorDetail);
+      }
+    } catch (error) {
+      console.error('Error posting comment:', error);
+    }
   };
 
   const [viewVisibility, setViewVisibility] = useState({});
@@ -487,6 +513,7 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
       [viewId]: newOpacity
     }));
   };
+
 
   return (
     <div className="pipeline-container">
@@ -749,6 +776,7 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
         fetchTaskComments={fetchTaskComments}
         handleAddComment={handleAddComment}
         currentUserRole={userRole}
+        currentUsername={currentUsername}
         fetchTasks={fetchTasks}
         viewVisibility={viewVisibility}
         toggleViewVisibility={toggleViewVisibility}
@@ -757,6 +785,6 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
       />
     </div>
   );
-}
 
+}
 export default Pipeline;

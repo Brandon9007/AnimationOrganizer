@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Date, ForeignKey,Boolean
 from database.database import Base 
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from typing import List, Optional 
 
 class Comments(Base):
     __tablename__ = "comments"

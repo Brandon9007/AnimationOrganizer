@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 
 // Recuerda ajustar el puerto si tu backend corre en 8000 o 8080
-const API_BASE_URL = 'http://localhost:8080';
+const API_BASE_URL = 'http://localhost:8000';
 
 function TasksSection({
   viewId,
@@ -15,6 +15,7 @@ function TasksSection({
   fetchTaskComments,
   handleAddComment,
   currentUserRole,
+  currentUsername,
   fetchTasks
 }) {
   const viewTasks = tasks.filter(t => t.views_pk === viewId && t.is_active !== false);
@@ -33,7 +34,7 @@ function TasksSection({
 
   const submitComment = (taskId) => {
     if (!newCommentText.trim()) return;
-    handleAddComment(taskId, newCommentText, currentUserRole);
+    handleAddComment(taskId, newCommentText);
     setNewCommentText('');
   };
 
@@ -139,11 +140,28 @@ function TasksSection({
                         <span style={{ color: '#777', fontSize: '12px', fontStyle: 'italic' }}>No hay comentarios aún.</span>
                       ) : (
                         taskComments[task.tasks_pk].map(comment => (
-                          <div key={comment.comments_pk} style={{ display: 'flex', flexDirection: 'column', background: comment.created_by === 'admin' ? '#2c3e50' : '#34495e', padding: '6px 10px', borderRadius: '4px', width: 'fit-content', maxWidth: '85%', alignSelf: comment.created_by === currentUserRole ? 'flex-end' : 'flex-start' }}>
-                            <span style={{ fontSize: '10px', color: '#bdc3c7', marginBottom: '2px' }}>{comment.created_by}</span>
-                            <span style={{ fontSize: '13px', color: 'white' }}>{comment.comments_description}</span>
-                          </div>
-                        ))
+                        <div
+                          key={comment.comments_pk}
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            background: comment.created_by === currentUsername ? '#2c3e50' : '#34495e',
+                            padding: '6px 10px',
+                            borderRadius: '4px',
+                            width: 'fit-content',
+                            maxWidth: '85%',
+                            alignSelf: comment.created_by === currentUsername ? 'flex-end' : 'flex-start'
+                          }}
+                        >
+                          <span style={{ fontSize: '10px', color: '#bdc3c7', marginBottom: '2px' }}>
+                            {comment.created_by}
+                          </span>
+                          <span style={{ fontSize: '13px', color: 'white' }}>
+                            {comment.comments_description}
+                          </span>
+                        </div>
+                      ))
+
                       )}
                     </div>
                     <div style={{ display: 'flex', gap: '5px' }}>

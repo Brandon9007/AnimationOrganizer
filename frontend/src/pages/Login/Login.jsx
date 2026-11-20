@@ -44,10 +44,13 @@ function Login() {
 
       //Buscamos extraer el token de usario 
       const tokenPayload = JSON.parse(atob(token.split('.')[1]));
-      const userRole = tokenPayload.role; //
+      const userRole = tokenPayload.role; 
+      const username = tokenPayload.sub || data.username || user;
 
       localStorage.setItem('user_role', userRole);
+      localStorage.setItem('user_name', username);
       console.log('TOKEN FASTAPI GUARDADO. ROL:', userRole);
+      console.log('USUARIO GUARDADO:', username);
 
       if (userRole === 'admin') {
         // ADMIN

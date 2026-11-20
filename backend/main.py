@@ -56,8 +56,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],       #Permitir los metodos HTTP si quiero bloquear algun metodo hay que editar aqui
-    allow_headers=["*"],       # Permite todos los headers
+    allow_methods=["*"],       
+    allow_headers=["*"],      
 )
 
 #Invocaione de los Routers
