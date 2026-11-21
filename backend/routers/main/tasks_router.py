@@ -37,6 +37,8 @@ class TasksClass(BaseModel):
     file_path: Optional[str] = None
 
     is_active: bool
+    start_date: Optional[date] = None  # K
+    due_date: Optional[date] = None    # K
     
 # Conexion a la base de datos 
 async def get_db():
@@ -80,6 +82,30 @@ def create_task(
     task_data: TasksClass,
     db: Session = Depends(get_db)
 ):
+    hoy = date.today()      #Crea las tareas con la fecha de hoy si no mandan fecha de inicio y fecha de entrega -K
+    
+    if not task_data.start_date:
+            task_data.start_date = hoy
+    
+    if not task_data.due_date:
+        if task_data.task_due_date:
+            task_data.due_date = task_data.task_due_date
+        else:
+            from datetime import timedelta
+            task_data.due_date = hoy + timedelta(days=7)
+    
+    if task_data.start_date < hoy:
+        raise HTTPException(
+            status_code=400,
+            detail="La fecha de inicio no puede ser menor a la fecha actual."
+        )
+    
+    if task_data.due_date < task_data.start_date:
+        raise HTTPException(
+            status_code=400,
+            detail="La fecha de entrega no puede ser anterior a la fecha de inicio."
+        )
+    
     existing_task = db.query(Tasks).filter(
         Tasks.task_name == task_data.task_name
     ).first()
@@ -101,6 +127,8 @@ def create_task(
         tasks_duration = task_data.tasks_duration,
         is_estatic = task_data.is_estatic,
         is_active=task_data.is_active,
+        start_date=task_data.start_date,    #K
+        due_date=task_data.due_date         #K
     )
 
     db.add(new_task)
@@ -186,3 +214,73 @@ async def upload_task_file(task_id: int, file: UploadFile = File(...), db: Sessi
     db.refresh(task)
 
     return {"message": "Archivo subido correctamente", "file_path": file_location}
+
+#ESTO ES PARA EL CRONOGRAMA -K
+@router.get("/cronograma")
+def obtener_datos_cronograma(db: Session = Depends(get_db)):
+    # Hacemos un JOIN entre Tasks, GroupTasks y Users
+    resultados = (
+        db.query(Tasks, User.user_pk, User.user_name)
+        .join(GroupTasks, Tasks.tasks_pk == GroupTasks.task_pk, isouter=True)
+        .join(User, GroupTasks.user_pk == User.user_pk, isouter=True)
+        .filter(Tasks.is_active == True)
+        .all()
+    )
+
+    # Formateamos la respuesta para que el frontend la consuma fácilmente
+    cronograma_data = []
+    for task, user_pk, user_name in resultados:
+        cronograma_data.append({
+            "task_id": task.tasks_pk,
+            "task_name": task.task_name,
+            "status": task.task_status,
+            "start_date": task.start_date or task.task_created_at,
+            "due_date": task.task_due_date or task.due_date,
+            "assigned_user_id": user_pk,
+            "assigned_user": user_name or "Sin asignar"
+        })
+
+    return cronograma_data
+
+# PARA ASIGNAR USUARIOS A LAS TASKS EN CRONOGRAMA -K
+class AsignacionUsuario(BaseModel):
+    user_pk: Optional[int] = None
+
+# Traer usuarios activos para llenar el dropdown del modal
+@router.get("/cronograma/usuarios")
+def obtener_usuarios_cronograma(db: Session = Depends(get_db)):
+    usuarios = db.query(User).all()
+    return [
+        {"user_pk": u.user_pk, "user_name": u.user_name}
+        for u in usuarios
+    ]
+
+# Asignar un usuario a una tarea en GroupTasks
+@router.put("/cronograma/{task_id}/asignar")
+def asignar_usuario_tarea(
+    task_id: int,
+    data: AsignacionUsuario,
+    db: Session = Depends(get_db)
+):
+    asignacion = db.query(GroupTasks).filter(GroupTasks.task_pk == task_id).first()
+
+    # Si mandan none, quitamos la asignación
+    if data.user_pk is None:
+        if asignacion:
+            db.delete(asignacion)
+            db.commit()
+        return {"message": "Usuario desasignado correctamente"}
+
+    # Si ya tenía a alguien asignado, lo actualizamos, si no, creamos el registro
+    if asignacion:
+        asignacion.user_pk = data.user_pk
+    else:
+        nueva_asignacion = GroupTasks(
+            task_pk=task_id,
+            user_pk=data.user_pk,
+            group_tasks_name="Asignación"
+        )
+        db.add(nueva_asignacion)
+
+    db.commit()
+    return {"message": "Usuario asignado correctamente"}

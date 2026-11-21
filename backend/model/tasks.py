@@ -38,3 +38,5 @@ class Tasks(Base):
     files_tasks_groups = relationship("FilesTasksGroups", back_populates="task")
     repositorygroups = relationship("RepositoryGroups", back_populates="task")  
     comments = relationship("Comments", back_populates = "task")
+    start_date = Column(Date, nullable=True)    #K
+    due_date = Column(Date, nullable=True)      #K
