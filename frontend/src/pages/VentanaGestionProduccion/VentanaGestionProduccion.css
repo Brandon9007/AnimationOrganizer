@@ -30,3 +30,61 @@
 .save-button:hover{
    background-color: #0f655d;
 }
+
+.search-section {
+    --color-primary: #2f3e51;   /* azul del formulario */
+    --color-accent: #20646b;    /* verde azulado del botón */
+
+    max-width: 900px;
+    margin: 24px auto 0;
+    padding: 0 16px;
+}
+
+.search-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    border: 1px solid #c9d1d9;
+    border-radius: 8px;
+    font-size: 1rem;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px rgba(32, 100, 107, 0.2);
+}
+
+.assignments-table {
+    width: 100%;
+    border-collapse: collapse;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.assignments-table th {
+    background-color: var(--color-primary);
+    color: #fff;
+    padding: 12px 16px;
+    text-align: left;
+}
+
+.assignments-table td {
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid #e3e8ee;
+}
+
+.assignments-table tbody tr:nth-child(even) {
+    background-color: #f6f8fa;
+}
+
+.assignments-table tbody tr {
+    transition: background-color 0.2s;
+}
+
+.assignments-table tbody tr:hover {
+    background-color: #e4eef0;
+}

@@ -3,9 +3,33 @@ import './VentanaGestionProduccion.css';
 
 function VentanaGestionProduccion() {
 
+    const [assignments, setAssignments] = React.useState([]);
+    const [searchText, setSearchText]= React.useState('');
     const [workers, setWorkers] = React.useState([]);
     const [homeworks, setHomeworks] = React.useState([]);
 
+
+    const loadAssignments = () => {
+        fetch("http://localhost:8000/groups_tasks")
+        .then(response =>{
+            if(!response.ok)
+                {
+                   throw new Error("Error en la respuesta del servidor");
+                }
+            return response.json();
+        })
+        .then (data => {
+            setAssignments(data.data);
+        })
+        .catch (error => {
+            console.error("Error al cargar asignaciones:", error)
+        }); 
+
+    };
+
+    useEffect(() => {
+        loadAssignments();
+    }, []);
     
     const [newAssignment, setNewAssignment] = React.useState(
         {
@@ -85,7 +109,7 @@ function VentanaGestionProduccion() {
 
         .then (data => {
             alert("Asignacion creada correctamente");
-
+            loadAssignments();
             setNewAssignment({
             group_tasks_name: '',
             task_pk: '',
@@ -97,12 +121,22 @@ function VentanaGestionProduccion() {
 
         .catch (error => {
                 console.error("Error al guardar:", error)
-        });
-        
-
-
+        });        
     }
 
+    const filteredAssignments = assignments.filter (a =>
+        a.group_tasks_name.toLowerCase().includes(searchText.toLowerCase())
+    );
+
+    const getWorkerName = (user_pk) => {
+        const  worker = workers.find(w => w.user_pk === user_pk)
+        return worker ? worker.user_name: 'Sin asignar';
+    };
+
+    const getTaskName = (task_pk) => {
+        const homework = homeworks.find(h => h.tasks_pk === task_pk)
+        return homework ? homework.task_name: 'Sin tarea';
+    };
 
     return (
         <div>
@@ -150,6 +184,40 @@ function VentanaGestionProduccion() {
                 >
                     Guardar
                 </button>
+            </div>
+            <div className="search-section">
+                <input
+                    className="search-input"
+                    type="text"
+                    placeholder="Buscar por nombre de asignacion"
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                />
+
+                <table className="assignments-table">
+                    <thead>
+                       <tr>
+                        <th>Asignacion</th>
+                        <th>Tarea</th>
+                        <th>Trabajador</th>
+                       </tr>
+                    </thead>
+                    
+                    <tbody>
+                        {filteredAssignments.map((a) => (
+                            <tr key={a.group_tasks_pk}>
+                                <td>{a.group_tasks_name}</td>
+                                <td>{getTaskName(a.task_pk)}</td>
+                                <td>{getWorkerName(a.user_pk)}</td>
+                                            
+                            </tr>
+
+                        ))
+                        }
+                    </tbody>
+                </table>
+
+
             </div>
         </div>
     );
