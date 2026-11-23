@@ -1,23 +1,13 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import List
-from datetime import date
+from typing import List, Optional
 
 from model.user import User
-from model.rol import Role
 from model.tasks import Tasks
-from model.files_tasks import FilesTasks
-from model.files_tasks_groups import FilesTasksGroups
-from model.files_tasks_type import FilesTasksTypes
-from model.groups_tasks_views import GroupsTasksViews
 from model.groups_tasks import GroupTasks
-from model.permisions import Permissions
-from model.permissions_group import PermissionsGroup
-from model.views import Views   
 
 from sqlalchemy.orm import Session
-from database.database import SessionLocal, engine
-
+from database.database import SessionLocal
 from routers.authentication.jwt_auth_users import require_admin
 
 router = APIRouter()
@@ -30,12 +20,11 @@ class GroupTasksClass(BaseModel):
     user_pk: int
 
 class GroupTasksCreate(BaseModel):
-    group_tasks_name: str
-    is_active: bool 
+    group_tasks_name: Optional[str] = None
+    is_active: bool = True
     task_pk: int
     user_pk: int
-    
-# Conexion a la base de datos 
+
 async def get_db():
     db = SessionLocal()
     try:
@@ -43,14 +32,13 @@ async def get_db():
     finally:
         db.close()
 
-# Endpoints
 # GET
 @router.get("/groups_tasks")
 async def obtener_groups_tasks(db: Session = Depends(get_db)):
-    groups_tasks = db.query(GroupTasks).all()
+    groups_tasks = db.query(GroupTasks).filter(GroupTasks.is_active == True).all()
 
     return {
-        "mensaje": "Conexión a la base de datos exitosa", 
+        "mensaje": "Conexión a la base de datos exitosa",
         "total_part": len(groups_tasks),
         "data": groups_tasks
     }
@@ -61,19 +49,43 @@ def create_group_task(
     data: GroupTasksCreate,
     db: Session = Depends(get_db)
 ):
-    existing = db.query(GroupTasks).filter(
-        GroupTasks.group_tasks_name == data.group_tasks_name
+    user = db.query(User).filter(User.user_pk == data.user_pk, User.is_active == True).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado o inactivo")
+
+    task = db.query(Tasks).filter(Tasks.tasks_pk == data.task_pk, Tasks.is_active == True).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Tarea no encontrada o inactiva")
+
+    auto_name = (
+        data.group_tasks_name.strip()
+        if data.group_tasks_name and data.group_tasks_name.strip()
+        else f"{user.user_name} - {task.task_name}"
+    )
+
+    existing_pair = db.query(GroupTasks).filter(
+        GroupTasks.task_pk == data.task_pk,
+        GroupTasks.user_pk == data.user_pk
     ).first()
 
-    if existing:
-        raise HTTPException(
-            status_code=400,
-            detail="Group Task name already exists"
-        )
+    if existing_pair:
+        if existing_pair.is_active:
+            raise HTTPException(
+                status_code=400,
+                detail="Este usuario ya está asignado a esta tarea"
+            )
+        existing_pair.is_active = True
+        existing_pair.group_tasks_name = auto_name
+        db.commit()
+        db.refresh(existing_pair)
+        return {
+            "message": "Asignación reactivada correctamente",
+            "data": existing_pair
+        }
 
     new_group_task = GroupTasks(
-        group_tasks_name=data.group_tasks_name,
-        is_active=data.is_active,
+        group_tasks_name=auto_name,
+        is_active=True,
         task_pk=data.task_pk,
         user_pk=data.user_pk
     )
@@ -83,75 +95,21 @@ def create_group_task(
     db.refresh(new_group_task)
 
     return {
-        "message": "Group Task created successfully",
+        "message": "Asignación creada correctamente",
         "data": new_group_task
     }
 
-# POST BULK
-@router.post("/groups_tasks/bulk", dependencies=[Depends(require_admin)])
-def create_groups_tasks_bulk(
-    group_tasks_list: List[GroupTasksClass],
-    db: Session = Depends(get_db)
-):
-    tasks_to_insert = [
-        GroupTasks(
-            group_tasks_pk=item.groups_tasks_pk,
-            group_tasks_name=item.groups_tasks_name,
-            is_active=item.is_active,
-            task_pk=item.tasks_pk,
-            user_pk=item.user_pk
-        )
-        for item in group_tasks_list
-    ]
-
-    db.add_all(tasks_to_insert)
-    db.commit()
-
-    return {
-        "message": f"{len(tasks_to_insert)} group tasks inserted"
-    }
-
-# PUT
-@router.put("/groups_tasks/{group_task_id}", dependencies=[Depends(require_admin)])
-def update_group_task(
-    group_task_id: int,
-    group_task_data: GroupTasksClass,
-    db: Session = Depends(get_db)
-):
-    group_task_actual = db.query(GroupTasks).filter(
-        GroupTasks.group_tasks_pk == group_task_id
-    ).first()
-
-    if not group_task_actual:
-        raise HTTPException(
-            status_code=404,
-            detail="Group Task not found"
-        )
-
-    group_task_actual.group_tasks_name = group_task_data.groups_tasks_name
-    group_task_actual.is_active = group_task_data.is_active
-    group_task_actual.task_pk = group_task_data.tasks_pk
-    group_task_actual.user_pk = group_task_data.user_pk
-
-    db.commit()
-    db.refresh(group_task_actual)
-
-    return {
-        "message": "Group Task updated",
-        "data": group_task_actual
-    }
-
-# DELETE
+# DELETE 
 @router.delete("/groups_tasks/{groups_tasks_pk}", dependencies=[Depends(require_admin)])
 async def borrar_group_task(groups_tasks_pk: int, db: Session = Depends(get_db)):
     group_task_actual = db.query(GroupTasks).filter(
         GroupTasks.group_tasks_pk == groups_tasks_pk
-    ).first() 
+    ).first()
 
     if not group_task_actual:
-        raise HTTPException(status_code=404, detail="Group Task no encontrado")
+        raise HTTPException(status_code=404, detail="Asignación no encontrada")
 
     group_task_actual.is_active = False
     db.commit()
-    
-    return {"mensaje": f"Group Task con ID {groups_tasks_pk} desactivado correctamente"}
+
+    return {"mensaje": f"Asignación con ID {groups_tasks_pk} eliminada correctamente"}

@@ -44,24 +44,50 @@ function ViewsSection({
   handleViewOpacityChange,
   currentUsername
 }) {
+  const isAdmin = (currentUserRole || '').toLowerCase() === 'admin';
+
   return (
     <div className="views-section-container">
-      {currentUserRole === "admin" && <div className="views-header-left">
-        <input
-          type="text"
-          className="view-name-input"
-          placeholder={`view_${viewCounter}`}
-          value={newViewNameInput}
-          onChange={(e) => setNewViewNameInput(e.target.value)}
-        />
-        <button onClick={handleCreateView} className="add-view-button" title="Agregar vista">+</button>
-      </div>}
-      {assetError && <p className="empty-views-text" role="alert">{assetError}</p>}
-      {writeError && <p className="empty-views-text" role="alert">{writeError}</p>}
+      <div className="views-header-row">
+        <div>
+          <span className="pipe-eyebrow">CAPAS Y SECUENCIAS</span>
+          <h3>Vistas del Proyecto</h3>
+        </div>
+
+        {isAdmin && (
+          <div className="views-header-left">
+            <input
+              type="text"
+              className="view-name-input"
+              placeholder={`Nombre (ej. view_${viewCounter})`}
+              value={newViewNameInput}
+              onChange={(e) => setNewViewNameInput(e.target.value)}
+            />
+            <button
+              onClick={handleCreateView}
+              className="add-view-button"
+              title="Agregar vista"
+            >
+              ＋ Nueva vista
+            </button>
+          </div>
+        )}
+      </div>
+
+      {assetError && (
+        <p className="pipe-alert" role="alert">
+          {assetError}
+        </p>
+      )}
+      {writeError && (
+        <p className="pipe-alert" role="alert">
+          {writeError}
+        </p>
+      )}
 
       <div className="views-content-area">
         {views.length === 0 ? (
-          <p className="empty-views-text">No hay vistas agregadas todavia</p>
+          <p className="empty-views-text">No hay vistas agregadas todavía en este proyecto.</p>
         ) : (
           views.map((view) => {
             const isActive = activeTimelineViewId === view.views_pk;
@@ -71,74 +97,70 @@ function ViewsSection({
             return (
               <div
                 key={view.views_pk}
-                className="view-item-card"
-                draggable={currentUserRole === "admin" && !view.assetsOnly}
+                className={`view-item-card ${isActive ? 'is-active' : ''} ${
+                  !isVisible ? 'is-hidden-layer' : ''
+                }`}
+                draggable={isAdmin && !view.assetsOnly}
                 onDragStart={(e) => onDragStartView(e, view.views_pk)}
                 onDragOver={onDragOverView}
                 onDrop={(e) => onDropView(e, view.views_pk)}
                 onClick={() => setActiveTimelineViewId(view.views_pk)}
-                style={{
-                  cursor: 'pointer',
-                  backgroundColor: isActive ? '#3b4554' : '',
-                  borderLeft: isActive ? '4px solid #4a90e2' : '4px solid transparent',
-                  opacity: isVisible ? 1 : 0.6,
-                  transition: 'background-color 0.2s, border-left 0.2s, opacity 0.2s'
-                }}
               >
                 <div className="view-item-header">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    {/* BOTÓN OJITO */}
+                  <div className="view-title-group">
                     <button
-                      title={isVisible ? 'Ocultar vista en reproductor' : 'Mostrar vista en reproductor'}
+                      type="button"
+                      className="view-eye-btn"
+                      title={
+                        isVisible
+                          ? 'Ocultar vista en reproductor'
+                          : 'Mostrar vista en reproductor'
+                      }
                       onClick={(e) => {
                         e.stopPropagation();
                         toggleViewVisibility(view.views_pk);
                       }}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        cursor: 'pointer',
-                        fontSize: '18px',
-                        padding: '0 4px'
-                      }}
                     >
                       {isVisible ? '👁️' : '🚫'}
                     </button>
-                    <h4 style={{ margin: 0 }}>{view.views_name}</h4>
+                    <h4>{view.views_name}</h4>
+                    {isActive && <span className="view-active-badge">● En timeline</span>}
                   </div>
 
-                  {currentUserRole === "admin" && !view.assetsOnly && <div className="view-actions">
-                    <button
-                      className="view-action-btn update-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleUpdateView(view.views_pk, view.views_order);
-                      }}
-                    >
-                      PUT
-                    </button>
-                    <button
-                      className="view-action-btn delete-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteView(view.views_pk);
-                      }}
-                    >
-                      DELETE
-                    </button>
-                  </div>}
+                  {isAdmin && !view.assetsOnly && (
+                    <div className="view-actions">
+                      <button
+                        type="button"
+                        className="view-action-btn update-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUpdateView(view.views_pk, view.views_order);
+                        }}
+                      >
+                        ✎ Renombrar
+                      </button>
+                      <button
+                        type="button"
+                        className="view-action-btn delete-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteView(view.views_pk);
+                        }}
+                      >
+                        🗑 Eliminar
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* SLIDER DE TRANSPARENCIA (OPACIDAD) */}
                 <Box
-                  sx={{ width: '100%', padding: '4px 10px' }}
+                  sx={{ width: '100%', padding: '2px 6px' }}
                   onClick={(e) => e.stopPropagation()}
-                  onMouseDown={(e) => e.stopPropagation()} // Evita activar el Drag & Drop de la tarjeta
+                  onMouseDown={(e) => e.stopPropagation()}
                 >
                   <Stack spacing={2} direction="row" sx={{ alignItems: 'center' }}>
-                    <span style={{ fontSize: '11px', color: '#ccc', whiteSpace: 'nowrap' }}>
-                      Opacidad: {opacity}%
-                    </span>
+                    <span className="view-opacity-label">Opacidad: {opacity}%</span>
                     <Slider
                       size="small"
                       aria-label="Opacidad de vista"
@@ -147,28 +169,33 @@ function ViewsSection({
                       max={100}
                       disabled={!isVisible}
                       onChange={(e, newValue) => handleViewOpacityChange(view.views_pk, newValue)}
-                      sx={{ color: '#4a90e2' }}
+                      sx={{ color: '#8b68e8' }}
                     />
                   </Stack>
                 </Box>
 
                 <div className="task-dropdown-container">
                   <button
+                    type="button"
                     className="task-dropdown-btn"
                     onClick={(e) => {
                       e.stopPropagation();
                       toggleTaskDropdown(view.views_pk);
                     }}
                   >
-                    Opciones de Tareas {openDropdownViewId === view.views_pk ? '▲' : '▼'}
+                    <span>Tareas de la vista</span>
+                    <span>{openDropdownViewId === view.views_pk ? '▲' : '▼'}</span>
                   </button>
 
                   {openDropdownViewId === view.views_pk && (
                     <div onClick={(e) => e.stopPropagation()}>
                       <TasksSection
                         viewId={view.views_pk}
-                        assetContexts={assetContexts.filter(context => context.views_pk === view.views_pk)}
-                        canManage={currentUserRole === 'admin' && !view.assetsOnly}
+                        assetContexts={assetContexts.filter(
+                          (context) => context.views_pk === view.views_pk
+                        )}
+                        canManage={isAdmin && !view.assetsOnly}
+                        isAdmin={isAdmin}
                         tasks={tasks}
                         openTaskModal={openTaskModal}
                         openEditTaskModal={openEditTaskModal}

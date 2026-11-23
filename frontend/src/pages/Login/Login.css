@@ -1,187 +1,141 @@
 @import url('https://fonts.googleapis.com/css2?family=Bungee+Hairline&display=swap');
 
 @font-palette-values --bungee-hairline-regular {
-
-font-family: "Bungee Hairline", sans-serif;
-
-font-weight: 400;
-
-font-style: normal;
-
+  font-family: "Bungee Hairline", sans-serif;
+  font-weight: 400;
+  font-style: normal;
 }
 
-.Login{
-
-text-align: center;
-
-background: #ffffff;
-
+.Login {
+  text-align: center;
+  min-height: 100vh;
+  background: linear-gradient(155deg, #f3e6ff 0%, #fce4f2 52%, #faf7ff 100%);
 }
 
-.Login-Logo{
-
-height: 10vmin;
-
-pointer-events: none;
-
+.Login * {
+  box-sizing: border-box;
 }
 
-.Login-Form {
-
-background: #ffffff;
-
-padding: 30px 40px;
-
-border-radius: 8px;
-
-box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-
-display: flex;
-
-flex-direction: column;
-
-width: 100%;
-
-max-width: 360px;
-
+.Login-Header {
+  min-height: 100vh;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: transparent;
+  color: #7c58d6;
 }
 
-.Login-Form div {
-
-display: flex;
-
-flex-direction: column;
-
-margin-bottom: 20px;
-
+.Login-Title {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  font-family: "Bungee Hairline", sans-serif;
+  font-size: calc(14px + 2vmin);
+  font-weight: 1000;
+  letter-spacing: 2px;
+  color: #6d43c7;
+  text-shadow: 0 2px 10px rgba(155, 107, 223, 0.18);
 }
 
-.Login-Form label {
-
-font-size: 14px;
-
-font-weight: bold;
-
-color: #333333;
-
-margin-bottom: 6px;
-
-text-align: left;
-
-}
-
-.Login-Form input {
-
-padding: 10px 12px;
-
-border: 1px solid #ccc;
-
-border-radius: 4px;
-
-font-size: 14px;
-
-outline: none;
-
-transition: border-color 0.2s;
-
-}
-
-.Login-Form input:focus {
-
-border-color: #393341;
-
-}
-
-.Login-Form button {
-
-background-color: #b878c5;
-
-color: white;
-
-border: none;
-
-padding: 12px;
-
-border-radius: 4px;
-
-font-size: 16px;
-
-font-weight: bold;
-
-cursor: pointer;
-
-transition: background-color 0.2s;
-
-margin-top: 10px;
-
-}
-
-.Login-Form button:hover {
-
-background-color: #48070d;
-
+.Login-Logo {
+  height: 9vmin;
+  min-height: 54px;
+  pointer-events: none;
+  filter: drop-shadow(0 6px 14px rgba(139, 104, 232, 0.25));
 }
 
 @media (prefers-reduced-motion: no-preference) {
-
-.Login-Logo{
-
-animation: Login-logo-spin infinite 20s linear;
-
+  .Login-Logo {
+    animation: Login-logo-spin infinite 20s linear;
+  }
 }
 
+.Login-Form {
+  background: #ffffff;
+  border: 1px solid #efe2fc;
+  padding: 34px 38px;
+  border-radius: 18px;
+  box-shadow: 0 16px 40px rgba(139, 104, 232, 0.14);
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 390px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-weight: 400;
+  color: #2b233d;
 }
 
-.Login-Header{
-
-background-color: #7f6581a2;
-
-min-height: 100vh;
-
-display: flex;
-
-flex-direction: column;
-
-align-items: center;
-
-justify-content: center;
-
-font-size: calc(10px + 2vmin);
-
-font-style: normal;
-
-font-weight: 1000;
-
-font-family:"Bungee Hairline",sans-serif;
-
-color: #aa47b8;
-
+.Login-Form div {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 18px;
 }
 
-.Login-Title{
+.Login-Form label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #675882;
+  margin-bottom: 6px;
+  text-align: left;
+  letter-spacing: 0.3px;
+}
 
-display: flex;
+.Login-Form input {
+  padding: 11px 14px;
+  border: 1px solid #e7daf7;
+  border-radius: 10px;
+  background: #fcfaff;
+  color: #2e2246;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
 
-justify-content: center;
+.Login-Form input::placeholder {
+  color: #a699bd;
+}
 
-align-items: center;
+.Login-Form input:focus {
+  background: #ffffff;
+  border-color: #b78ef0;
+  box-shadow: 0 0 0 3px rgba(183, 142, 240, 0.18);
+}
 
-width: 100%;
+.Login-Form button {
+  background: linear-gradient(135deg, #8b68e8 0%, #d978b8 100%);
+  color: #ffffff;
+  border: none;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 8px;
+  box-shadow: 0 6px 16px rgba(155, 107, 223, 0.28);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
 
+.Login-Form button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(155, 107, 223, 0.38);
+}
+
+.Login-Form button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 @keyframes Login-logo-spin {
-
-from {
-
-transform: rotate(0deg);
-
-}
-
-to {
-
-transform: rotate(360deg);
-
-}
-
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }

@@ -36,7 +36,7 @@ function Login() {
       localStorage.setItem('fastapi_token', access_token);
       localStorage.setItem('user_role', role);
       localStorage.setItem('user_name', username || user);
-      navigate('/dashboard', { replace: true });
+     navigate('/proyectos', { replace: true });
 
     } catch (error) {
       console.error('ERROR COMPLETO:', error);

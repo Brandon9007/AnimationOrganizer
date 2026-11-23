@@ -1,13 +1,13 @@
 import React, { useState, useRef } from 'react';
 import AssetsTarea from '../../components/Sidebar/AssetsTarea';
 
-// Recuerda ajustar el puerto si tu backend corre en 8000 o 8080
 const API_BASE_URL = 'http://localhost:8000';
 
 function TasksSection({
   viewId,
   assetContexts,
   canManage,
+  isAdmin,
   tasks,
   openTaskModal,
   openEditTaskModal,
@@ -20,8 +20,14 @@ function TasksSection({
   currentUsername,
   fetchTasks
 }) {
-  const viewTasks = new Map(tasks.filter(task => task.views_pk === viewId && task.is_active !== false)
-    .map(task => [task.tasks_pk, task]));
+  const token = localStorage.getItem('fastapi_token');
+
+  const viewTasks = new Map(
+    tasks
+      .filter((task) => task.views_pk === viewId && task.is_active !== false)
+      .map((task) => [task.tasks_pk, task])
+  );
+
   const projectsByTask = new Map();
   for (const context of assetContexts) {
     if (!viewTasks.has(context.tasks_pk)) {
@@ -30,6 +36,7 @@ function TasksSection({
     if (!projectsByTask.has(context.tasks_pk)) projectsByTask.set(context.tasks_pk, []);
     projectsByTask.get(context.tasks_pk).push(context);
   }
+
   const [openChatTaskId, setOpenChatTaskId] = useState(null);
   const [newCommentText, setNewCommentText] = useState('');
   const fileInputRefs = useRef({});
@@ -54,22 +61,23 @@ function TasksSection({
     if (!file) return;
 
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append('file', file);
 
     try {
       const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/upload`, {
         method: 'POST',
-        body: formData,
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData
       });
 
       if (response.ok) {
-        alert("Archivo subido con éxito");
+        alert('Archivo subido con éxito');
         if (fetchTasks) fetchTasks();
       } else {
-        alert("Error al subir archivo");
+        alert('Error al subir archivo');
       }
     } catch (error) {
-      console.error("Upload error:", error);
+      console.error('Upload error:', error);
     }
   };
 
@@ -81,112 +89,187 @@ function TasksSection({
 
   return (
     <div className="task-dropdown-menu-container">
-      {canManage && <button className="create-task-btn" onClick={() => openTaskModal(viewId)}>
-        ➕ Crear Nueva Tarea
-      </button>}
+      {canManage && (
+        <button
+          type="button"
+          className="create-task-btn"
+          onClick={() => openTaskModal(viewId)}
+        >
+          ＋ Crear Nueva Tarea
+        </button>
+      )}
 
-      <div className="tasks-list" style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '15px' }}>
+      <div className="tasks-list">
         {viewTasks.size === 0 ? (
-          <p className="empty-tasks-text" style={{ width: '100%' }}>No hay tareas en esta vista</p>
+          <p className="empty-tasks-text">No hay tareas en esta vista</p>
         ) : (
-          Array.from(viewTasks.values(), task => {
+          Array.from(viewTasks.values(), (task) => {
             const isImage = task.file_path && task.file_path.match(/\.(jpeg|jpg|gif|png)$/i);
             const isVideo = task.file_path && task.file_path.match(/\.(mp4|webm|ogg|mov)$/i);
+            const isCompleted =
+              task.task_status === 'Completada' || task.task_status === 'Completado';
 
             return (
-              <div key={task.tasks_pk} className="task-item-container task-item" style={{ display: 'flex', flexDirection: 'column', background: '#1e2128', border: '1px solid #333', borderRadius: '6px' }}>
+              <div key={task.tasks_pk} className="task-item-container task-item">
+                <div className="task-item-main">
+                  <div className="task-item-left">
+                    <div className="task-title-row">
+                      {/* Candado estático: interactivo solo para Admin, solo lectura para User */}
+                      {!task.assetsOnly &&
+                        (isAdmin ? (
+                          <button
+                            type="button"
+                            className="task-lock-btn"
+                            onClick={() => handleToggleLock(task)}
+                            title={
+                              task.is_estatic
+                                ? 'Desbloquear tarea estática'
+                                : 'Marcar como tarea estática'
+                            }
+                          >
+                            {task.is_estatic ? '🔒' : '🔓'}
+                          </button>
+                        ) : (
+                          task.is_estatic && (
+                            <span
+                              className="task-static-readonly"
+                              title="Tarea estática (solo administrador)"
+                            >
+                              🔒 Estática
+                            </span>
+                          )
+                        ))}
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden', gap: '8px' }}>
-                      {canManage && !task.assetsOnly && <span onClick={() => handleToggleLock(task)} style={{ cursor: 'pointer', fontSize: '16px' }} title={task.is_estatic ? "Desbloquear Tarea" : "Bloquear Tarea"}>
-                        {task.is_estatic ? '🔒' : '🔓'}
-                      </span>}
-                      <span className="task-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 'bold', color: 'white' }}>
-                        {task.task_name}
-                      </span>
+                      <span className="task-name">{task.task_name}</span>
                     </div>
 
-                    {/* MINIATURA DEL ARCHIVO SUBIDO */}
+                    {/* Miniatura del archivo subido */}
                     {task.file_path && (
-                      <div style={{ marginTop: '5px', padding: '2px', border: '1px dashed #555', display: 'inline-block', borderRadius: '4px', background: '#111' }}>
+                      <div className="task-media-preview">
                         {isImage && (
-                          <img src={`${API_BASE_URL}/${task.file_path}`} alt="preview" style={{ height: '40px', width: 'auto', borderRadius: '2px' }} />
+                          <img src={`${API_BASE_URL}/${task.file_path}`} alt="preview" />
                         )}
                         {isVideo && (
-                          <video src={`${API_BASE_URL}/${task.file_path}`} style={{ height: '40px', width: 'auto', borderRadius: '2px' }} muted />
+                          <video src={`${API_BASE_URL}/${task.file_path}`} muted />
                         )}
                       </div>
                     )}
                   </div>
 
-                  {!task.assetsOnly && <div className="task-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <input
-                      type="file"
-                      accept="video/*, image/*"
-                      style={{ display: 'none' }}
-                      ref={el => fileInputRefs.current[task.tasks_pk] = el}
-                      onChange={(e) => handleFileUpload(e, task.tasks_pk)}
-                    />
-                    <button title="Subir Archivo" onClick={() => triggerFileInput(task.tasks_pk)} style={{ background: '#8e44ad', border: 'none', borderRadius: '4px', cursor: 'pointer', color: 'white', padding: '4px 8px', fontSize: '11px' }}>
-                      📎 Subir
-                    </button>
+                  {!task.assetsOnly && (
+                    <div className="task-actions">
+                      <input
+                        type="file"
+                        accept="video/*, image/*"
+                        style={{ display: 'none' }}
+                        ref={(el) => (fileInputRefs.current[task.tasks_pk] = el)}
+                        onChange={(e) => handleFileUpload(e, task.tasks_pk)}
+                      />
+                      <button
+                        type="button"
+                        className="task-btn-upload"
+                        title="Subir Archivo"
+                        onClick={() => triggerFileInput(task.tasks_pk)}
+                      >
+                        📎 Subir
+                      </button>
 
-                    {canManage && <button title="Cambiar Estatus" onClick={() => handleToggleStatus(task)} style={{ background: task.task_status === 'Completada' ? '#27ae60' : '#f39c12', border: 'none', borderRadius: '4px', cursor: 'pointer', color: 'white', fontWeight: 'bold', padding: '4px 8px', fontSize: '11px' }}>
-                      {task.task_status === 'Completada' ? ' Completada' : 'Pendiente'}
-                    </button>}
+                      {/* Estatus: botón editable solo para Admin; badge fijo para User */}
+                      {isAdmin ? (
+                        <button
+                          type="button"
+                          className={`task-status-btn ${isCompleted ? 'done' : 'pending'}`}
+                          title="Cambiar Estatus"
+                          onClick={() => handleToggleStatus(task)}
+                        >
+                          {isCompleted ? '✓ Completada' : '● Pendiente'}
+                        </button>
+                      ) : (
+                        <span
+                          className={`task-status-readonly ${isCompleted ? 'done' : 'pending'}`}
+                          title="Solo un administrador puede cambiar el estado"
+                        >
+                          {task.task_status || 'Pendiente'}
+                        </span>
+                      )}
 
-                    <button title="Chat de la Tarea" onClick={() => toggleChat(task.tasks_pk)} style={{ background: '#34495e', border: 'none', borderRadius: '4px', cursor: 'pointer', color: 'white', padding: '4px 8px', fontSize: '11px' }}>
-                      💬 CHAT
-                    </button>
-                    {canManage && <>
-                    <button title="Actualizar" onClick={() => openEditTaskModal(task)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#4a90e2', fontWeight: 'bold', fontSize: '12px' }}>PUT</button>
-                    <button title="Borrar" onClick={() => handleDeleteTask(task.tasks_pk)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#e74c3c', fontWeight: 'bold', fontSize: '12px' }}>DELETE</button>
-                    </>}
-                  </div>}
+                      <button
+                        type="button"
+                        className="task-btn-chat"
+                        title="Chat de la Tarea"
+                        onClick={() => toggleChat(task.tasks_pk)}
+                      >
+                        💬 Chat
+                      </button>
+
+                      {canManage && (
+                        <>
+                          <button
+                            type="button"
+                            className="task-btn-edit"
+                            title="Editar tarea"
+                            onClick={() => openEditTaskModal(task)}
+                          >
+                            ✎
+                          </button>
+                          <button
+                            type="button"
+                            className="task-btn-delete"
+                            title="Eliminar tarea"
+                            onClick={() => handleDeleteTask(task.tasks_pk)}
+                          >
+                            🗑
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {projectsByTask.get(task.tasks_pk)?.map(context => (
-                  <div key={context.project_pk} style={{ padding: '0 10px 10px' }}>
-                    {projectsByTask.get(task.tasks_pk).length > 1 && <h5>{context.project_name}</h5>}
+                {projectsByTask.get(task.tasks_pk)?.map((context) => (
+                  <div key={context.project_pk} className="task-assets-wrap">
+                    {projectsByTask.get(task.tasks_pk).length > 1 && (
+                      <h5>{context.project_name}</h5>
+                    )}
                     <AssetsTarea proyectoId={context.project_pk} tareaId={task.tasks_pk} />
                   </div>
                 ))}
 
                 {openChatTaskId === task.tasks_pk && (
-                  <div style={{ background: '#16181d', padding: '10px', borderTop: '1px solid #333', borderBottomLeftRadius: '6px', borderBottomRightRadius: '6px' }}>
-                    <div style={{ maxHeight: '150px', overflowY: 'auto', marginBottom: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {(!taskComments[task.tasks_pk] || taskComments[task.tasks_pk].length === 0) ? (
-                        <span style={{ color: '#777', fontSize: '12px', fontStyle: 'italic' }}>No hay comentarios aún.</span>
+                  <div className="task-chat-box">
+                    <div className="task-chat-messages">
+                      {!taskComments[task.tasks_pk] ||
+                      taskComments[task.tasks_pk].length === 0 ? (
+                        <span className="task-chat-empty">No hay comentarios aún.</span>
                       ) : (
-                        taskComments[task.tasks_pk].map(comment => (
-                        <div
-                          key={comment.comments_pk}
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            background: comment.created_by === currentUsername ? '#2c3e50' : '#34495e',
-                            padding: '6px 10px',
-                            borderRadius: '4px',
-                            width: 'fit-content',
-                            maxWidth: '85%',
-                            alignSelf: comment.created_by === currentUsername ? 'flex-end' : 'flex-start'
-                          }}
-                        >
-                          <span style={{ fontSize: '10px', color: '#bdc3c7', marginBottom: '2px' }}>
-                            {comment.created_by}
-                          </span>
-                          <span style={{ fontSize: '13px', color: 'white' }}>
-                            {comment.comments_description}
-                          </span>
-                        </div>
-                      ))
-
+                        taskComments[task.tasks_pk].map((comment) => {
+                          const isMine = comment.created_by === currentUsername;
+                          return (
+                            <div
+                              key={comment.comments_pk}
+                              className={`task-chat-bubble ${isMine ? 'mine' : 'other'}`}
+                            >
+                              <span className="task-chat-author">{comment.created_by}</span>
+                              <span className="task-chat-text">
+                                {comment.comments_description}
+                              </span>
+                            </div>
+                          );
+                        })
                       )}
                     </div>
-                    <div style={{ display: 'flex', gap: '5px' }}>
-                      <input type="text" placeholder="Escribe un comentario..." value={newCommentText} onChange={(e) => setNewCommentText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitComment(task.tasks_pk)} style={{ flex: 1, padding: '6px', borderRadius: '4px', border: '1px solid #555', background: '#222', color: 'white', fontSize: '12px' }} />
-                      <button onClick={() => submitComment(task.tasks_pk)} style={{ background: '#4a90e2', border: 'none', borderRadius: '4px', cursor: 'pointer', color: 'white', padding: '6px 12px', fontWeight: 'bold', fontSize: '12px' }}>Enviar</button>
+
+                    <div className="task-chat-input-row">
+                      <input
+                        type="text"
+                        placeholder="Escribe un comentario..."
+                        value={newCommentText}
+                        onChange={(e) => setNewCommentText(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && submitComment(task.tasks_pk)}
+                      />
+                      <button type="button" onClick={() => submitComment(task.tasks_pk)}>
+                        Enviar
+                      </button>
                     </div>
                   </div>
                 )}

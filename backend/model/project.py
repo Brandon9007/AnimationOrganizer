@@ -16,3 +16,4 @@ class Project(Base):
     # Relationships
     project_views = relationship("ProjectViews", back_populates="project")
     project_users = relationship("ProjectUsers", back_populates="project")
+    

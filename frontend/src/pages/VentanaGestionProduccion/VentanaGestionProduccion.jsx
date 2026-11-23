@@ -1,226 +1,401 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './VentanaGestionProduccion.css';
 
-function VentanaGestionProduccion() {
+const API_URL = 'http://localhost:8000';
 
-    const [assignments, setAssignments] = React.useState([]);
-    const [searchText, setSearchText]= React.useState('');
-    const [workers, setWorkers] = React.useState([]);
-    const [homeworks, setHomeworks] = React.useState([]);
+export default function VentanaGestionProduccion() {
+  const navigate = useNavigate();
+  const token = localStorage.getItem('fastapi_token');
+  const userRole = (localStorage.getItem('user_role') || '').toLowerCase();
+  const isAdmin = userRole === 'admin';
 
+  const [projects, setProjects] = useState([]);
+  const [selectedProjectId, setSelectedProjectId] = useState(
+    localStorage.getItem('active_project_id') || ''
+  );
 
-    const loadAssignments = () => {
-        fetch("http://localhost:8000/groups_tasks")
-        .then(response =>{
-            if(!response.ok)
-                {
-                   throw new Error("Error en la respuesta del servidor");
-                }
-            return response.json();
-        })
-        .then (data => {
-            setAssignments(data.data);
-        })
-        .catch (error => {
-            console.error("Error al cargar asignaciones:", error)
-        }); 
+  const [projectViews, setProjectViews] = useState([]);
+  const [projectUserIds, setProjectUserIds] = useState([]);
 
-    };
+  const [assignments, setAssignments] = useState([]);
+  const [workers, setWorkers] = useState([]);
+  const [homeworks, setHomeworks] = useState([]);
 
-    useEffect(() => {
-        loadAssignments();
-    }, []);
-    
-    const [newAssignment, setNewAssignment] = React.useState(
-        {
-            group_tasks_name: '',
-            task_pk: '',
-            user_pk: '',
-            is_active: true
+  const [searchText, setSearchText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+
+  const [newAssignment, setNewAssignment] = useState({
+    task_pk: '',
+    user_pk: ''
+  });
+
+  // Bloqueo de acceso para no administradores
+  useEffect(() => {
+    if (!isAdmin) {
+      navigate('/proyectos', { replace: true });
+    }
+  }, [isAdmin, navigate]);
+
+  const loadBaseData = async () => {
+    setError('');
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const [projRes, assignRes, usersRes, tasksRes] = await Promise.all([
+        fetch(`${API_URL}/projects/my-projects`, { headers }),
+        fetch(`${API_URL}/groups_tasks`, { headers }),
+        fetch(`${API_URL}/users`, { headers }),
+        fetch(`${API_URL}/tasks`, { headers })
+      ]);
+
+      if (projRes.ok) {
+        const projJson = await projRes.json();
+        const list = projJson.data || [];
+        setProjects(list);
+        if (list.length > 0 && !list.some((p) => String(p.project_pk) === String(selectedProjectId))) {
+          setSelectedProjectId(String(list[0].project_pk));
         }
-    );
-      //Cargar trabajadores
-    useEffect(() => {
-        fetch("http://localhost:8000/users")
-            .then (response => {
-                if(!response.ok)
-                {
-                    throw new Error("Error en la respuesta del servidor");
-                }
-                return response.json();
-            })
-            .then (data => {
-                setWorkers(data.data);
-            })
-            .catch (error => {
-                console.error("Error al cargar trabajadores:", error);
-            });
-    }, []);
+      }
 
-    //Cargar tareas
-    useEffect(() => {
-        fetch("http://localhost:8000/tasks")
-            .then (response => {
-                if(!response.ok)
-                {
-                    throw new Error("Error en la respuesta del servidor");
-                }
-                return response.json();
-            })
-            .then (data => {
-                setHomeworks(data.data);
-            })
-            .catch (error => {
-                console.error("Error al cargar trabajadores:", error)
-            })
+      if (assignRes.ok) {
+        const assignJson = await assignRes.json();
+        setAssignments((assignJson.data || []).filter((a) => a.is_active !== false));
+      }
 
-    },[]);
+      if (usersRes.ok) {
+        const usersJson = await usersRes.json();
+        setWorkers((usersJson.data || []).filter((u) => u.is_active));
+      }
 
-    const addTask = () => {
-        if(!newAssignment.task_pk || !newAssignment.user_pk || !newAssignment.group_tasks_name) {
-            alert('Por favor, complete todos los campos antes de agregar la tarea.');
-            return;
+      if (tasksRes.ok) {
+        const tasksJson = await tasksRes.json();
+        setHomeworks((tasksJson.data || []).filter((t) => t.is_active !== false));
+      }
+    } catch (err) {
+      setError('Error al cargar los datos de producción.');
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdmin) {
+      loadBaseData();
+    }
+  }, [isAdmin]);
+
+  // Cargar vistas y equipo del proyecto seleccionado
+  useEffect(() => {
+    if (!selectedProjectId || !isAdmin) return;
+    const headers = { Authorization: `Bearer ${token}` };
+
+    Promise.all([
+      fetch(`${API_URL}/projects/${selectedProjectId}/views`, { headers }),
+      fetch(`${API_URL}/projects/${selectedProjectId}/users`, { headers })
+    ])
+      .then(async ([vRes, uRes]) => {
+        if (vRes.ok) {
+          const vJson = await vRes.json();
+          setProjectViews(vJson.data || []);
+        } else {
+          setProjectViews([]);
         }
+        if (uRes.ok) {
+          const uJson = await uRes.json();
+          setProjectUserIds(uJson.user_ids || []);
+        } else {
+          setProjectUserIds([]);
+        }
+      })
+      .catch((err) => console.error('Error cargando contexto del proyecto:', err));
+  }, [selectedProjectId, isAdmin, token]);
 
-        const assignmentData = {
-            group_tasks_name: newAssignment.group_tasks_name,
-            task_pk: parseInt(newAssignment.task_pk),
-            user_pk: parseInt(newAssignment.user_pk),
-            is_active: newAssignment.is_active
-        };
+  // Tareas filtradas al proyecto actual
+  const projectTasks = useMemo(() => {
+    if (!selectedProjectId) return homeworks;
+    const viewIds = new Set(projectViews.map((v) => v.views_pk));
+    return homeworks.filter((t) => viewIds.has(t.views_pk));
+  }, [homeworks, projectViews, selectedProjectId]);
 
-        fetch (
-            "http://localhost:8000/groups_tasks",
-            {
-                method: 'POST',
-                headers:  { 'Content-Type': 'application/json' },
-                body: JSON.stringify(assignmentData)
-                
-            }
-        )
+  // Usuarios del proyecto actual (si tiene miembros asignados; si no, muestra todos los activos)
+  const projectWorkers = useMemo(() => {
+    if (!projectUserIds.length) return workers;
+    const idSet = new Set(projectUserIds);
+    const filtered = workers.filter((w) => idSet.has(w.user_pk));
+    return filtered.length > 0 ? filtered : workers;
+  }, [workers, projectUserIds]);
 
-        .then (response => {
-            if(!response.ok)
-                {
-                   throw new Error("Error en la respuesta del servidor");
-                }
-            return response.json();
-        })
+  // Vista previa automática: "NombreUsuario - NombreTarea"
+  const autoGeneratedName = useMemo(() => {
+    const worker = workers.find((w) => String(w.user_pk) === String(newAssignment.user_pk));
+    const task = homeworks.find((h) => String(h.tasks_pk) === String(newAssignment.task_pk));
+    if (!worker || !task) return '';
+    return `${worker.user_name} - ${task.task_name}`;
+  }, [workers, homeworks, newAssignment]);
 
-        .then (data => {
-            alert("Asignacion creada correctamente");
-            loadAssignments();
-            setNewAssignment({
-            group_tasks_name: '',
-            task_pk: '',
-            user_pk: '',
-            is_active: true
-        });
+  const handleAddAssignment = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccessMsg('');
 
-        })
-
-        .catch (error => {
-                console.error("Error al guardar:", error)
-        });        
+    if (!newAssignment.task_pk || !newAssignment.user_pk) {
+      setError('Selecciona una tarea y un integrante del equipo.');
+      return;
     }
 
-    const filteredAssignments = assignments.filter (a =>
-        a.group_tasks_name.toLowerCase().includes(searchText.toLowerCase())
-    );
+    setSubmitting(true);
+    try {
+      const response = await fetch(`${API_URL}/groups_tasks`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          group_tasks_name: autoGeneratedName,
+          task_pk: parseInt(newAssignment.task_pk, 10),
+          user_pk: parseInt(newAssignment.user_pk, 10),
+          is_active: true
+        })
+      });
 
-    const getWorkerName = (user_pk) => {
-        const  worker = workers.find(w => w.user_pk === user_pk)
-        return worker ? worker.user_name: 'Sin asignar';
-    };
+      const json = await response.json();
+      if (!response.ok) {
+        throw new Error(json.detail || 'No se pudo guardar la asignación.');
+      }
 
-    const getTaskName = (task_pk) => {
-        const homework = homeworks.find(h => h.tasks_pk === task_pk)
-        return homework ? homework.task_name: 'Sin tarea';
-    };
+      setSuccessMsg(`Asignación creada: "${autoGeneratedName}"`);
+      setNewAssignment({ task_pk: '', user_pk: '' });
+      await loadBaseData();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-    return (
+  const handleDeleteAssignment = async (assignment) => {
+    if (!window.confirm(`¿Quitar la asignación "${assignment.group_tasks_name}"?`)) return;
+    setError('');
+    setSuccessMsg('');
+    try {
+      const res = await fetch(`${API_URL}/groups_tasks/${assignment.group_tasks_pk}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('No se pudo eliminar la asignación.');
+      await loadBaseData();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const getWorkerName = (user_pk) => {
+    const worker = workers.find((w) => w.user_pk === user_pk);
+    return worker ? worker.user_name : 'Sin asignar';
+  };
+
+  const getTaskName = (task_pk) => {
+    const homework = homeworks.find((h) => h.tasks_pk === task_pk);
+    return homework ? homework.task_name : 'Tarea eliminada';
+  };
+
+  // Filtrar asignaciones del proyecto actual y por búsqueda
+  const filteredAssignments = useMemo(() => {
+    const taskIdSet = new Set(projectTasks.map((t) => t.tasks_pk));
+    const q = searchText.trim().toLowerCase();
+
+    return assignments.filter((a) => {
+      const belongsToProject = !selectedProjectId || taskIdSet.has(a.task_pk);
+      if (!belongsToProject) return false;
+
+      if (!q) return true;
+      const wName = getWorkerName(a.user_pk).toLowerCase();
+      const tName = getTaskName(a.task_pk).toLowerCase();
+      return (
+        a.group_tasks_name.toLowerCase().includes(q) ||
+        wName.includes(q) ||
+        tName.includes(q)
+      );
+    });
+  }, [assignments, projectTasks, selectedProjectId, searchText, workers, homeworks]);
+
+  if (!isAdmin) return null;
+
+  return (
+    <main className="prod-page">
+      <header className="prod-header">
         <div>
-            <h1>Ventana Gestion Produccion</h1>
-            <div className="task-form">
-
-                <input
-                    type="text"
-                    placeholder="Nombre de la asignacion"
-                    value={newAssignment.group_tasks_name}
-                    onChange={(e) => setNewAssignment({ ...newAssignment, group_tasks_name: e.target.value})}
-                />
-
-                <select
-                    value={newAssignment.task_pk}
-                    onChange={(e) => setNewAssignment({ ...newAssignment, task_pk: e.target.value })}
-                >
-                    <option value="">Seleccionar tarea</option>
-
-                    {homeworks.map((homework) => (
-                        <option key={homework.tasks_pk} value={homework.tasks_pk}>
-                            {homework.task_name}
-                        </option>
-                    ))}
-                </select>
-
-
-                <select
-                    value={newAssignment.user_pk}
-                    onChange={(e) => setNewAssignment({ ...newAssignment, user_pk: e.target.value })}
-                >
-                    <option value="">Seleccionar trabajador</option>
-
-                    {workers.map((worker) => (
-                        <option key={worker.user_pk} value={worker.user_pk}>
-                            {worker.user_name}
-                        </option>
-                    ))}
-                </select>
-
-                
-                <button
-                    className="save-button"
-                    onClick={() => addTask()}
-                >
-                    Guardar
-                </button>
-            </div>
-            <div className="search-section">
-                <input
-                    className="search-input"
-                    type="text"
-                    placeholder="Buscar por nombre de asignacion"
-                    value={searchText}
-                    onChange={(e) => setSearchText(e.target.value)}
-                />
-
-                <table className="assignments-table">
-                    <thead>
-                       <tr>
-                        <th>Asignacion</th>
-                        <th>Tarea</th>
-                        <th>Trabajador</th>
-                       </tr>
-                    </thead>
-                    
-                    <tbody>
-                        {filteredAssignments.map((a) => (
-                            <tr key={a.group_tasks_pk}>
-                                <td>{a.group_tasks_name}</td>
-                                <td>{getTaskName(a.task_pk)}</td>
-                                <td>{getWorkerName(a.user_pk)}</td>
-                                            
-                            </tr>
-
-                        ))
-                        }
-                    </tbody>
-                </table>
-
-
-            </div>
+          <span className="prod-eyebrow">CONTROL DE PRODUCCIÓN</span>
+          <h1>Asignación de Tareas</h1>
+          <p></p>
         </div>
-    );
-}
 
-export default VentanaGestionProduccion;
+        <div className="prod-project-picker">
+          <label htmlFor="prod-project">Proyecto activo</label>
+          <select
+            id="prod-project"
+            value={selectedProjectId}
+            onChange={(e) => {
+              const id = e.target.value;
+              setSelectedProjectId(id);
+              setNewAssignment({ task_pk: '', user_pk: '' });
+              const found = projects.find((p) => String(p.project_pk) === String(id));
+              if (found) {
+                localStorage.setItem('active_project_id', String(found.project_pk));
+                localStorage.setItem('active_project_name', found.project_name);
+              }
+            }}
+          >
+            {projects.map((p) => (
+              <option key={p.project_pk} value={p.project_pk}>
+                {p.project_name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </header>
+
+      {error && <div className="prod-alert error">{error}</div>}
+      {successMsg && <div className="prod-alert success">{successMsg}</div>}
+
+      {/* Estadísticas rápidas */}
+      <div className="prod-stats">
+        <div>
+          <strong>{filteredAssignments.length}</strong>
+          <span>Asignaciones en el proyecto</span>
+        </div>
+        <div>
+          <strong>{projectTasks.length}</strong>
+          <span>Tareas disponibles</span>
+        </div>
+        <div>
+          <strong>{projectWorkers.length}</strong>
+          <span>Miembros en equipo</span>
+        </div>
+      </div>
+
+      {/* Formulario de Nueva Asignación */}
+      <section className="prod-card">
+        <div className="prod-card-head">
+          <span className="prod-eyebrow">NUEVO ENLACE</span>
+          <h2>Asignar tarea a trabajador</h2>
+        </div>
+
+        <form className="prod-form-grid" onSubmit={handleAddAssignment}>
+          <div className="prod-field">
+            <label htmlFor="prod-user">Trabajador *</label>
+            <select
+              id="prod-user"
+              value={newAssignment.user_pk}
+              onChange={(e) =>
+                setNewAssignment({ ...newAssignment, user_pk: e.target.value })
+              }
+            >
+              <option value="">Seleccionar trabajador...</option>
+              {projectWorkers.map((worker) => (
+                <option key={worker.user_pk} value={worker.user_pk}>
+                  {worker.user_name} ({worker.user_email})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="prod-field">
+            <label htmlFor="prod-task">Tarea del proyecto *</label>
+            <select
+              id="prod-task"
+              value={newAssignment.task_pk}
+              onChange={(e) =>
+                setNewAssignment({ ...newAssignment, task_pk: e.target.value })
+              }
+            >
+              <option value="">Seleccionar tarea...</option>
+              {projectTasks.map((homework) => (
+                <option key={homework.tasks_pk} value={homework.tasks_pk}>
+                  {homework.task_name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button type="submit" className="prod-primary" disabled={submitting}>
+            {submitting ? 'Guardando...' : '＋ Asignar tarea'}
+          </button>
+        </form>
+
+        {/* Vista previa del nombre generado automáticamente */}
+        {autoGeneratedName && (
+          <div className="prod-auto-preview">
+            <span>Registro automático:</span>
+            <strong>{autoGeneratedName}</strong>
+          </div>
+        )}
+      </section>
+
+      {/* Tabla de Asignaciones */}
+      <section className="prod-card">
+        <div className="prod-table-toolbar">
+          <div>
+            <h2>Asignaciones activas</h2>
+            <p>{filteredAssignments.length} registros encontrados</p>
+          </div>
+
+          <input
+            className="prod-search"
+            type="text"
+            placeholder="⌕ ..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+          />
+        </div>
+
+        {filteredAssignments.length === 0 ? (
+          <div className="prod-empty">
+            <span>◈</span>
+            <h3>Sin asignaciones registradas</h3>
+            <p>Selecciona un trabajador y una tarea arriba para crear la primera asignación.</p>
+          </div>
+        ) : (
+          <div className="prod-table-wrap">
+            <table className="prod-table">
+              <thead>
+                <tr>
+                  <th>Asignación (Usuario - Tarea)</th>
+                  <th>Trabajador</th>
+                  <th>Tarea</th>
+                  <th style={{ textAlign: 'right' }}>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredAssignments.map((a) => (
+                  <tr key={a.group_tasks_pk}>
+                    <td>
+                      <strong className="prod-assign-title">{a.group_tasks_name}</strong>
+                    </td>
+                    <td>
+                      <span className="prod-pill user">● {getWorkerName(a.user_pk)}</span>
+                    </td>
+                    <td>
+                      <span className="prod-pill task">▤ {getTaskName(a.task_pk)}</span>
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <button
+                        type="button"
+                        className="prod-btn-remove"
+                        onClick={() => handleDeleteAssignment(a)}
+                      >
+                        Quitar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}

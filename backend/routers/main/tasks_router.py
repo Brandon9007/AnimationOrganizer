@@ -70,7 +70,7 @@ def get_tasks(db: Session = Depends(get_db)):
             "tasks_duration": task.tasks_duration,
             "tasks_order": task.tasks_order,
             "is_active": task.is_active,
-            "file_path": task.file_path, # <-- ESTO FALTABA PARA QUE REACT VEA EL ARCHIVO
+            "file_path": task.file_path, 
             "views_pk": task.group_tasks_views[0].views_pk if task.group_tasks_views else None 
         }
         result.append(task_dict)
@@ -84,7 +84,7 @@ def create_task(
     task_data: TasksClass,
     db: Session = Depends(get_db)
 ):
-    hoy = date.today()      #Crea las tareas con la fecha de hoy si no mandan fecha de inicio y fecha de entrega -K
+    hoy = date.today()     
     
     if not task_data.start_date:
             task_data.start_date = hoy
@@ -227,7 +227,6 @@ async def borrar_task(tasks_pk: int, db: Session = Depends(get_db)):
     
     return {"mensaje": f"Task con ID {tasks_pk} desactivado correctamente"}
 
-#Importante para los archivos multimedia 
 #POST 
 @router.post("/tasks/{task_id}/upload")
 async def upload_task_file(task_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
@@ -235,22 +234,19 @@ async def upload_task_file(task_id: int, file: UploadFile = File(...), db: Sessi
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    # Guardar el archivo localmente
     file_location = f"uploads/{task_id}_{file.filename}"
     with open(file_location, "wb+") as file_object:
         shutil.copyfileobj(file.file, file_object)
 
-    # Actualizar la base de datos
     task.file_path = file_location
     db.commit()
     db.refresh(task)
 
     return {"message": "Archivo subido correctamente", "file_path": file_location}
 
-#ESTO ES PARA EL CRONOGRAMA -K
+#Cronograma
 @router.get("/cronograma")
 def obtener_datos_cronograma(db: Session = Depends(get_db)):
-    # Hacemos un JOIN entre Tasks, GroupTasks y Users
     resultados = (
         db.query(Tasks, User.user_pk, User.user_name)
         .join(GroupTasks, Tasks.tasks_pk == GroupTasks.task_pk, isouter=True)
@@ -259,7 +255,6 @@ def obtener_datos_cronograma(db: Session = Depends(get_db)):
         .all()
     )
 
-    # Formateamos la respuesta para que el frontend la consuma fácilmente
     cronograma_data = []
     for task, user_pk, user_name in resultados:
         cronograma_data.append({
@@ -274,11 +269,9 @@ def obtener_datos_cronograma(db: Session = Depends(get_db)):
 
     return cronograma_data
 
-# PARA ASIGNAR USUARIOS A LAS TASKS EN CRONOGRAMA -K
 class AsignacionUsuario(BaseModel):
     user_pk: Optional[int] = None
 
-# Traer usuarios activos para llenar el dropdown del modal
 @router.get("/cronograma/usuarios")
 def obtener_usuarios_cronograma(db: Session = Depends(get_db)):
     usuarios = db.query(User).all()
@@ -287,7 +280,6 @@ def obtener_usuarios_cronograma(db: Session = Depends(get_db)):
         for u in usuarios
     ]
 
-# Asignar un usuario a una tarea en GroupTasks
 @router.put("/cronograma/{task_id}/asignar")
 def asignar_usuario_tarea(
     task_id: int,
@@ -296,14 +288,12 @@ def asignar_usuario_tarea(
 ):
     asignacion = db.query(GroupTasks).filter(GroupTasks.task_pk == task_id).first()
 
-    # Si mandan none, quitamos la asignación
     if data.user_pk is None:
         if asignacion:
             db.delete(asignacion)
             db.commit()
         return {"message": "Usuario desasignado correctamente"}
 
-    # Si ya tenía a alguien asignado, lo actualizamos, si no, creamos el registro
     if asignacion:
         asignacion.user_pk = data.user_pk
     else:

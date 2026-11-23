@@ -9,10 +9,8 @@ class ProjectViews(Base):
     project_views_pk = Column(Integer, primary_key=True, index=True)
     is_active = Column(Boolean, default=True)
 
-    #Foreign Keys
     project_fk = Column(Integer, ForeignKey("project.project_pk"))
-    view_fk = Column(Integer, ForeignKey("views.views_pk"))
-    
-    # Relationships
-    project = relationship("Project", back_populates="project_views")
+    view_fk = Column(Integer, ForeignKey("views.views_pk"), unique=True)
+
+    project = relationship("Project", back_populates="project_users" if False else "project_views")
     view = relationship("Views", back_populates="project_views")

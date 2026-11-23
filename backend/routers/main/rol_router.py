@@ -138,5 +138,3 @@ async def borrar_user(users_pk: int, db: Session = Depends(get_db)):
     
     return {"mensaje": f"Role con ID {users_pk} borrado correctamente"}
 
-
-

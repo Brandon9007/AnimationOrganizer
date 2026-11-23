@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import List
-
+from typing import List, Optional
 from model.proyectviews import ProjectViews
 
 from sqlalchemy.orm import Session
@@ -12,8 +11,8 @@ from routers.authentication.jwt_auth_users import require_admin
 router = APIRouter()
 
 class ProjectViewsClass(BaseModel):
-    project_views_pk: int
-    is_active: bool
+    project_views_pk: Optional[int] = None
+    is_active: bool = True
     project_fk: int
     view_fk: int
     
@@ -25,7 +24,7 @@ async def get_db():
     finally:
         db.close()
 
-# Endpoints
+# Endpointsa
 # GET
 @router.get("/project_views")
 async def obtener_project_views(db: Session = Depends(get_db)):
@@ -37,24 +36,23 @@ async def obtener_project_views(db: Session = Depends(get_db)):
         "data": project_views
     }
 
-# POST
 @router.post("/project_views", dependencies=[Depends(require_admin)])
 def create_project_view(
     project_view_data: ProjectViewsClass,
     db: Session = Depends(get_db)
 ):
-    existing_project_view = db.query(ProjectViews).filter(
-        ProjectViews.project_views_pk == project_view_data.project_views_pk
+    existing_view_link = db.query(ProjectViews).filter(
+        ProjectViews.view_fk == project_view_data.view_fk,
+        ProjectViews.is_active == True
     ).first()
 
-    if existing_project_view:
+    if existing_view_link:
         raise HTTPException(
             status_code=400,
-            detail="Project View ID already exists"
+            detail="Esta vista ya pertenece a otro proyecto"
         )
 
     new_project_view = ProjectViews(
-        project_views_pk=project_view_data.project_views_pk,
         is_active=project_view_data.is_active,
         project_fk=project_view_data.project_fk,
         view_fk=project_view_data.view_fk
@@ -67,29 +65,6 @@ def create_project_view(
     return {
         "message": "Project View created successfully",
         "data": new_project_view
-    }
-
-# POST BULK
-@router.post("/project_views/bulk", dependencies=[Depends(require_admin)])
-def create_project_views_bulk(
-    project_views_list: List[ProjectViewsClass],
-    db: Session = Depends(get_db)
-):
-    project_views_to_insert = [
-        ProjectViews(
-            project_views_pk=item.project_views_pk,
-            is_active=item.is_active,
-            project_fk=item.project_fk,
-            view_fk=item.view_fk
-        )
-        for item in project_views_list
-    ]
-
-    db.add_all(project_views_to_insert)
-    db.commit()
-
-    return {
-        "message": f"{len(project_views_to_insert)} project views inserted"
     }
 
 # PUT
