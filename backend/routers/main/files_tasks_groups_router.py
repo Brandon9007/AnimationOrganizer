@@ -18,6 +18,8 @@ from model.views import Views
 from sqlalchemy.orm import Session
 from database.database import SessionLocal, engine
 
+from routers.authentication.jwt_auth_users import require_admin
+
 router = APIRouter()
 
 class FilesTasksGroupsClass(BaseModel):
@@ -48,7 +50,7 @@ async def obtener_files_tasks_groups(db: Session = Depends(get_db)):
     }
 
 # POST
-@router.post("/files_tasks_groups")
+@router.post("/files_tasks_groups", dependencies=[Depends(require_admin)])
 def create_files_tasks_group(
     group_data: FilesTasksGroupsClass,
     db: Session = Depends(get_db)
@@ -68,7 +70,7 @@ def create_files_tasks_group(
         files_tasks_groups_name=group_data.files_tasks_groups_name,
         is_active=group_data.is_active,
         task_pk=group_data.task_pk,
-        file_tasks=group_data.file_tasks
+        file_task_pk=group_data.file_tasks
     )
 
     db.add(new_group)
@@ -81,7 +83,7 @@ def create_files_tasks_group(
     }
 
 # POST BULK
-@router.post("/files_tasks_groups/bulk")
+@router.post("/files_tasks_groups/bulk", dependencies=[Depends(require_admin)])
 def create_files_tasks_groups_bulk(
     groups_list: List[FilesTasksGroupsClass],
     db: Session = Depends(get_db)
@@ -92,7 +94,7 @@ def create_files_tasks_groups_bulk(
             files_tasks_groups_name=item.files_tasks_groups_name,
             is_active=item.is_active,
             task_pk=item.task_pk,
-            file_tasks=item.file_tasks
+            file_task_pk=item.file_tasks
         )
         for item in groups_list
     ]
@@ -105,7 +107,7 @@ def create_files_tasks_groups_bulk(
     }
 
 # PUT
-@router.put("/files_tasks_groups/{group_id}")
+@router.put("/files_tasks_groups/{group_id}", dependencies=[Depends(require_admin)])
 def update_files_tasks_group(
     group_id: int,
     group_data: FilesTasksGroupsClass,
@@ -124,7 +126,7 @@ def update_files_tasks_group(
     group_actual.files_tasks_groups_name = group_data.files_tasks_groups_name
     group_actual.is_active = group_data.is_active
     group_actual.task_pk = group_data.task_pk
-    group_actual.file_tasks = group_data.file_tasks
+    group_actual.file_task_pk = group_data.file_tasks
 
     db.commit()
     db.refresh(group_actual)
@@ -135,7 +137,7 @@ def update_files_tasks_group(
     }
 
 # DELETE
-@router.delete("/files_tasks_groups/{group_pk}")
+@router.delete("/files_tasks_groups/{group_pk}", dependencies=[Depends(require_admin)])
 async def borrar_files_tasks_group(group_pk: int, db: Session = Depends(get_db)):
     group_actual = db.query(FilesTasksGroups).filter(
         FilesTasksGroups.files_tasks_groups_pk == group_pk

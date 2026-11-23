@@ -27,38 +27,16 @@ function Login() {
         body: formData,
       });
 
-      console.log('STATUS :', response.status);
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.detail || 'Error al iniciar sesión');
       }
 
-      const data = await response.json();
-      const token = data.access_token;
-
-      console.log('RESPUESTA :', data);
-
-      //TOKEN de Usuario
-      localStorage.setItem('fastapi_token', token);
-
-      //Buscamos extraer el token de usario 
-      const tokenPayload = JSON.parse(atob(token.split('.')[1]));
-      const userRole = tokenPayload.role; 
-      const username = tokenPayload.sub || data.username || user;
-
-      localStorage.setItem('user_role', userRole);
-      localStorage.setItem('user_name', username);
-      console.log('TOKEN FASTAPI GUARDADO. ROL:', userRole);
-      console.log('USUARIO GUARDADO:', username);
-
-      if (userRole === 'admin') {
-        // ADMIN
-        navigate('/dashboard', { replace: true });
-      } else {
-        // USER
-        navigate('/dashboard', { replace: true });
-      }
+      const { access_token, role, username } = await response.json();
+      localStorage.setItem('fastapi_token', access_token);
+      localStorage.setItem('user_role', role);
+      localStorage.setItem('user_name', username || user);
+      navigate('/dashboard', { replace: true });
 
     } catch (error) {
       console.error('ERROR COMPLETO:', error);

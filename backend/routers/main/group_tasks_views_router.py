@@ -18,6 +18,8 @@ from model.views import Views
 from sqlalchemy.orm import Session
 from database.database import SessionLocal, engine
 
+from routers.authentication.jwt_auth_users import require_admin
+
 router = APIRouter()
 
 class GroupsTasksViewsClass(BaseModel):
@@ -48,7 +50,7 @@ async def obtener_groups_tasks_views(db: Session = Depends(get_db)):
     }
 
 # POST
-@router.post("/groups_tasks_views")
+@router.post("/groups_tasks_views", dependencies=[Depends(require_admin)])
 def create_groups_tasks_view(
     view_data: GroupsTasksViewsClass,
     db: Session = Depends(get_db)
@@ -81,7 +83,7 @@ def create_groups_tasks_view(
     }
 
 # POST BULK
-@router.post("/groups_tasks_views/bulk")
+@router.post("/groups_tasks_views/bulk", dependencies=[Depends(require_admin)])
 def create_groups_tasks_views_bulk(
     views_list: List[GroupsTasksViewsClass],
     db: Session = Depends(get_db)
@@ -105,7 +107,7 @@ def create_groups_tasks_views_bulk(
     }
 
 # PUT
-@router.put("/groups_tasks_views/{view_id}")
+@router.put("/groups_tasks_views/{view_id}", dependencies=[Depends(require_admin)])
 def update_groups_tasks_view(
     view_id: int,
     view_data: GroupsTasksViewsClass,
@@ -135,7 +137,7 @@ def update_groups_tasks_view(
     }
 
 # DELETE
-@router.delete("/groups_tasks_views/{view_pk}")
+@router.delete("/groups_tasks_views/{view_pk}", dependencies=[Depends(require_admin)])
 async def borrar_groups_tasks_view(view_pk: int, db: Session = Depends(get_db)):
     view_actual = db.query(GroupsTasksViews).filter(
         GroupsTasksViews.groups_tasks_views_pk == view_pk

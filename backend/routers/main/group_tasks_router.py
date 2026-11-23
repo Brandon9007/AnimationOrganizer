@@ -18,6 +18,8 @@ from model.views import Views
 from sqlalchemy.orm import Session
 from database.database import SessionLocal, engine
 
+from routers.authentication.jwt_auth_users import require_admin
+
 router = APIRouter()
 
 class GroupTasksClass(BaseModel):
@@ -54,7 +56,7 @@ async def obtener_groups_tasks(db: Session = Depends(get_db)):
     }
 
 # POST
-@router.post("/groups_tasks")
+@router.post("/groups_tasks", dependencies=[Depends(require_admin)])
 def create_group_task(
     data: GroupTasksCreate,
     db: Session = Depends(get_db)
@@ -86,17 +88,17 @@ def create_group_task(
     }
 
 # POST BULK
-@router.post("/groups_tasks/bulk")
+@router.post("/groups_tasks/bulk", dependencies=[Depends(require_admin)])
 def create_groups_tasks_bulk(
     group_tasks_list: List[GroupTasksClass],
     db: Session = Depends(get_db)
 ):
     tasks_to_insert = [
         GroupTasks(
-            groups_tasks_pk=item.groups_tasks_pk,
-            groups_tasks_name=item.groups_tasks_name,
+            group_tasks_pk=item.groups_tasks_pk,
+            group_tasks_name=item.groups_tasks_name,
             is_active=item.is_active,
-            tasks_pk=item.tasks_pk,
+            task_pk=item.tasks_pk,
             user_pk=item.user_pk
         )
         for item in group_tasks_list
@@ -110,14 +112,14 @@ def create_groups_tasks_bulk(
     }
 
 # PUT
-@router.put("/groups_tasks/{group_task_id}")
+@router.put("/groups_tasks/{group_task_id}", dependencies=[Depends(require_admin)])
 def update_group_task(
     group_task_id: int,
     group_task_data: GroupTasksClass,
     db: Session = Depends(get_db)
 ):
     group_task_actual = db.query(GroupTasks).filter(
-        GroupTasks.groups_tasks_pk == group_task_id
+        GroupTasks.group_tasks_pk == group_task_id
     ).first()
 
     if not group_task_actual:
@@ -126,9 +128,9 @@ def update_group_task(
             detail="Group Task not found"
         )
 
-    group_task_actual.groups_tasks_name = group_task_data.groups_tasks_name
+    group_task_actual.group_tasks_name = group_task_data.groups_tasks_name
     group_task_actual.is_active = group_task_data.is_active
-    group_task_actual.tasks_pk = group_task_data.tasks_pk
+    group_task_actual.task_pk = group_task_data.tasks_pk
     group_task_actual.user_pk = group_task_data.user_pk
 
     db.commit()
@@ -140,10 +142,10 @@ def update_group_task(
     }
 
 # DELETE
-@router.delete("/groups_tasks/{groups_tasks_pk}")
+@router.delete("/groups_tasks/{groups_tasks_pk}", dependencies=[Depends(require_admin)])
 async def borrar_group_task(groups_tasks_pk: int, db: Session = Depends(get_db)):
     group_task_actual = db.query(GroupTasks).filter(
-        GroupTasks.groups_tasks_pk == groups_tasks_pk
+        GroupTasks.group_tasks_pk == groups_tasks_pk
     ).first() 
 
     if not group_task_actual:

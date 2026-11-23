@@ -8,6 +8,8 @@ from model.project import Project
 from sqlalchemy.orm import Session
 from database.database import SessionLocal, engine
 
+from routers.authentication.jwt_auth_users import require_admin
+
 router = APIRouter()
 
 class ProjectClass(BaseModel):
@@ -38,7 +40,7 @@ async def obtener_projects(db: Session = Depends(get_db)):
     }
 
 # POST
-@router.post("/projects")
+@router.post("/projects", dependencies=[Depends(require_admin)])
 def create_project(
     project_data: ProjectClass,
     db: Session = Depends(get_db)
@@ -71,7 +73,7 @@ def create_project(
     }
 
 # POST BULK
-@router.post("/projects/bulk")
+@router.post("/projects/bulk", dependencies=[Depends(require_admin)])
 def create_projects_bulk(
     projects_list: List[ProjectClass],
     db: Session = Depends(get_db)
@@ -95,7 +97,7 @@ def create_projects_bulk(
     }
 
 # PUT
-@router.put("/projects/{project_id}")
+@router.put("/projects/{project_id}", dependencies=[Depends(require_admin)])
 def update_project(
     project_id: int,
     project_data: ProjectClass,
@@ -125,7 +127,7 @@ def update_project(
     }
 
 # DELETE
-@router.delete("/projects/{project_pk}")
+@router.delete("/projects/{project_pk}", dependencies=[Depends(require_admin)])
 async def borrar_project(project_pk: int, db: Session = Depends(get_db)):
     project_actual = db.query(Project).filter(
         Project.project_pk == project_pk

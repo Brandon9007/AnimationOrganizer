@@ -18,6 +18,8 @@ from model.views import Views
 from sqlalchemy.orm import Session
 from database.database import SessionLocal, engine
 
+from routers.authentication.jwt_auth_users import require_admin
+
 router = APIRouter()
 
 class ViewsClass(BaseModel):
@@ -48,7 +50,7 @@ async def obtener_views(db: Session = Depends(get_db)):
     }
 
 # POST
-@router.post("/views")
+@router.post("/views", dependencies=[Depends(require_admin)])
 def create_view(
     view_data: ViewsClass,
     db: Session = Depends(get_db)
@@ -79,7 +81,7 @@ def create_view(
     }
 
 # POST BULK
-@router.post("/views/bulk")
+@router.post("/views/bulk", dependencies=[Depends(require_admin)])
 def create_views_bulk(
     views_list: List[ViewsClass],
     db: Session = Depends(get_db)
@@ -101,7 +103,7 @@ def create_views_bulk(
     }
 
 # PUT
-@router.put("/views/{view_id}")
+@router.put("/views/{view_id}", dependencies=[Depends(require_admin)])
 def update_view(
     view_id: int,
     view_data: ViewsClass,
@@ -130,7 +132,7 @@ def update_view(
     }
 
 # DELETE
-@router.delete("/views/{views_pk}")
+@router.delete("/views/{views_pk}", dependencies=[Depends(require_admin)])
 async def borrar_view(views_pk: int, db: Session = Depends(get_db)):
     view_actual = db.query(Views).filter(
         Views.views_pk == views_pk

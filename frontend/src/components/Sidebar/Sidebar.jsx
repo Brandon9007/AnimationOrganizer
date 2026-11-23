@@ -43,6 +43,10 @@ function Sidebar() {
                         Repositorio
                     </button>
 
+                    <button className="Buttom" onClick={() => navigate("/mis-assets")}>
+                        Mis assets
+                    </button>
+
                     <button className="Buttom" onClick={() => navigate("/cronograma")}>
                         Cronograma
                     </button>

@@ -21,6 +21,8 @@ from model.views import Views
 from sqlalchemy.orm import Session
 from database.database import SessionLocal, engine
 
+from routers.authentication.jwt_auth_users import require_admin
+
 router = APIRouter()
 
 class TasksClass(BaseModel):
@@ -77,7 +79,7 @@ def get_tasks(db: Session = Depends(get_db)):
 
 
 # POST
-@router.post("/tasks")
+@router.post("/tasks", dependencies=[Depends(require_admin)])
 def create_task(
     task_data: TasksClass,
     db: Session = Depends(get_db)
@@ -140,8 +142,38 @@ def create_task(
         "data": new_task
     }
 
+# POST BULK
+@router.post("/tasks/bulk", dependencies=[Depends(require_admin)])
+def create_tasks_bulk(
+    tasks_list: List[TasksClass],
+    db: Session = Depends(get_db)
+):
+    tasks_to_insert = [
+        Tasks(
+        tasks_pk=task.tasks_pk,
+        task_name=task.task_name,
+        task_description=task.task_description,
+        task_status=task.task_status,
+        task_created_at=task.task_created_at,
+        task_updated_at=task.task_updated_at,
+        task_due_date=task.task_due_date,
+        tasks_order = task.tasks_order,
+        tasks_duration = task.tasks_duration,
+        is_estatic = task.is_estatic,
+        is_active=task.is_active,
+        )
+        for task in tasks_list
+    ]
+
+    db.add_all(tasks_to_insert)
+    db.commit()
+
+    return {
+        "message": f"{len(tasks_to_insert)} tasks inserted"
+    }
+
 # PUT
-@router.put("/tasks/{task_id}")
+@router.put("/tasks/{task_id}", dependencies=[Depends(require_admin)])
 def update_task(
     task_id: int,
     task_data: TasksClass,
@@ -177,7 +209,7 @@ def update_task(
     }
 
 # DELETE
-@router.delete("/tasks/{tasks_pk}")
+@router.delete("/tasks/{tasks_pk}", dependencies=[Depends(require_admin)])
 async def borrar_task(tasks_pk: int, db: Session = Depends(get_db)):
     task_actual = db.query(Tasks).filter(
         Tasks.tasks_pk == tasks_pk
