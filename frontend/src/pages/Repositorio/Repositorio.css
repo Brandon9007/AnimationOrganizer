@@ -1,0 +1,122 @@
+.repo-page{padding:32px;max-width:1500px;margin:auto;color:#222b3d;font-family:inherit}.repo-page *{box-sizing:border-box}.repo-header{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:26px}.repo-eyebrow{font-size:11px;letter-spacing:2px;font-weight:800;color:#6d68cf}.repo-header h1{font-size:30px;margin:8px 0}.repo-header p,.repo-toolbar p{color:#8590a2;margin:0}.repo-primary{background:#655bd8;color:white;border:0;border-radius:10px;padding:12px 19px;cursor:pointer;text-decoration:none;font-weight:700;white-space:nowrap}.repo-outline{border:1px solid #dfe2ee;background:white;border-radius:10px;padding:11px 16px;cursor:pointer;color:#444b62;font-weight:600}.repo-project-bar{display:flex;align-items:end;gap:14px;margin-bottom:18px}.repo-project-bar>div{display:flex;flex-direction:column;gap:6px}.repo-project-bar label{font-size:12px;color:#737d90;font-weight:700}.repo-project-bar select,.repo-new-project input{min-width:220px;background:white;border:1px solid #dfe2ee;padding:11px;border-radius:9px;color:#30364b}.repo-new-project{display:flex;gap:9px;margin-bottom:20px}.repo-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:24px}.repo-stats>div{border:1px solid #e8eaf2;background:#fff;border-radius:14px;padding:18px 21px;display:flex;flex-direction:column;gap:6px}.repo-stats strong{font-size:25px}.repo-stats span{font-size:13px;color:#8790a0}.repo-workspace{display:grid;grid-template-columns:225px minmax(0,1fr);border:1px solid #e8eaf2;border-radius:15px;overflow:hidden;background:#fff;min-height:500px}.repo-sidebar{padding:24px 12px;border-right:1px solid #edf0f6}.repo-sidebar h3{font-size:13px;padding:0 13px;margin:0 0 20px;color:#8992a5}.repo-folder{display:flex;align-items:center;gap:12px;border:0;background:transparent;border-radius:9px;width:100%;padding:12px;text-align:left;cursor:pointer;color:#5b6579;font-weight:600}.repo-folder.active{background:#f0eeff;color:#655bd8}.repo-folder span{font-size:19px;width:20px}.repo-folder small{margin-left:auto;color:#9da4b3}.repo-content{padding:24px;min-width:0}.repo-toolbar{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:22px}.repo-toolbar h2{font-size:19px;margin:0 0 5px}.repo-tools{display:flex;gap:6px}.repo-tools input{border:1px solid #e1e5ed;border-radius:9px;padding:10px 13px;min-width:210px}.repo-tools button{border:1px solid #e1e5ed;background:white;border-radius:8px;padding:8px 11px;cursor:pointer}.repo-tools button.selected{background:#eeedff;color:#655bd8}.repo-dropzone{border:2px dashed #d8d6f5;border-radius:13px;background:#fafaff;display:flex;flex-direction:column;align-items:center;gap:8px;padding:28px 15px;text-align:center;color:#657085;margin-bottom:24px}.repo-dropzone.dragging{background:#eae7ff;border-color:#655bd8}.repo-dropzone strong{color:#30364b}.repo-dropzone button{background:none;border:0;color:#655bd8;font-weight:800;cursor:pointer}.repo-dropzone small{color:#9ba4b3}.repo-upload-icon{display:grid;place-items:center;background:#eae7ff;border-radius:12px;width:42px;height:42px;color:#655bd8;font-size:27px}.repo-empty{text-align:center;padding:36px 12px;color:#8992a5}.repo-empty>span{font-size:46px;color:#c6c1ee}.repo-empty h3{color:#3e4659;margin:8px 0}.repo-empty p{margin:0}.repo-assets.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:16px}.repo-asset{border:1px solid #e8eaf2;border-radius:12px;overflow:hidden;min-width:0}.repo-thumbnail{height:130px;width:100%;display:grid;place-items:center;background:#f5f6fb;border:0;cursor:pointer;color:#7169c9}.repo-thumbnail img{width:100%;height:100%;object-fit:cover}.repo-thumbnail>span{font-size:42px}.repo-asset-info{display:flex;flex-direction:column;gap:5px;padding:12px}.repo-asset-info strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}.repo-asset-info span,.repo-asset-info small{font-size:11px;color:#8992a5}.repo-asset-actions{display:flex;gap:7px;padding:0 10px 10px;justify-content:flex-end}.repo-asset-actions button,.repo-asset-actions a{background:#f3f4fa;border:0;border-radius:7px;padding:5px 9px;cursor:pointer;text-decoration:none;color:#626b81;font-size:17px}.repo-assets.list{display:flex;flex-direction:column;gap:10px}.repo-assets.list .repo-asset{display:flex;align-items:center}.repo-assets.list .repo-thumbnail{width:75px;height:65px;flex-shrink:0}.repo-assets.list .repo-thumbnail>span{font-size:25px}.repo-assets.list .repo-asset-info{flex:1;min-width:0}.repo-assets.list .repo-asset-actions{padding:10px}.repo-note{font-size:12px;color:#9099a8;margin-top:16px}.repo-modal-backdrop{position:fixed;inset:0;background:#141625b8;z-index:9999;display:grid;place-items:center;padding:20px}.repo-modal{background:white;border-radius:16px;width:min(700px,100%);overflow:hidden}.repo-modal-header,.repo-modal-footer{padding:17px 20px;display:flex;justify-content:space-between;align-items:center;gap:15px}.repo-modal-header strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.repo-modal-header button{border:0;background:none;font-size:27px;cursor:pointer}.repo-preview{background:#f4f5f9;min-height:250px;max-height:60vh;display:grid;place-items:center}.repo-preview img,.repo-preview video{max-width:100%;max-height:60vh}.repo-preview audio{width:85%}.repo-no-preview{text-align:center;color:#8790a2}.repo-no-preview span{font-size:55px}.repo-modal-footer span{font-size:13px;color:#8992a5}@media(max-width:800px){.repo-page{padding:16px}.repo-header{align-items:flex-start;flex-direction:column}.repo-stats{grid-template-columns:repeat(2,1fr)}.repo-workspace{grid-template-columns:1fr}.repo-sidebar{border-right:0;border-bottom:1px solid #edf0f6;display:flex;overflow-x:auto;gap:6px;padding:12px}.repo-sidebar h3{display:none}.repo-folder{white-space:nowrap;width:auto}.repo-folder small{display:none}.repo-toolbar{flex-direction:column;align-items:stretch}.repo-tools input{min-width:0;flex:1}.repo-project-bar{flex-wrap:wrap}}
+/* ==========================================
+   ASSETS DEL TRABAJADOR
+========================================== */
+
+.repo-worker-panel {
+  background: #ffffff;
+  border: 1px solid #e8eaf2;
+  border-radius: 15px;
+  padding: 24px;
+  min-height: 350px;
+}
+
+/* ENCABEZADO */
+
+.repo-worker-panel h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #30364b;
+  margin-bottom: 6px;
+}
+
+/* TARJETAS DE ARCHIVOS */
+
+.repo-worker-file-icon {
+  height: 120px;
+  background: #f5f6fb;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 45px;
+  color: #655bd8;
+}
+
+/* BOTONES */
+
+.repo-worker-actions {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  flex-wrap: wrap;
+}
+
+.repo-worker-actions button {
+  flex: 1;
+  min-width: 90px;
+
+  padding: 10px;
+  border-radius: 8px;
+
+  font-size: 12px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition: 0.2s;
+}
+
+.repo-worker-actions .repo-primary {
+  background: #655bd8;
+  color: white;
+  border: none;
+}
+
+.repo-worker-actions .repo-primary:hover {
+  background: #5147c5;
+}
+
+.repo-worker-actions .repo-outline {
+  background: white;
+  color: #655bd8;
+  border: 1px solid #655bd8;
+}
+
+.repo-worker-actions .repo-outline:hover {
+  background: #f0eeff;
+}
+
+/* MENSAJES DE ERROR */
+
+.repo-worker-error {
+  padding: 14px;
+
+  border-radius: 8px;
+
+  background: #fff0f0;
+  color: #9b2424;
+
+  border: 1px solid #f5c6c6;
+
+  margin-bottom: 20px;
+}
+
+/* VISTA PREVIA PDF */
+
+.repo-pdf-preview {
+  width: 100%;
+  height: 60vh;
+  border: none;
+}
+
+/* RESPONSIVE */
+
+@media (max-width: 768px) {
+  .repo-worker-panel {
+    padding: 15px;
+  }
+
+  .repo-worker-actions {
+    flex-direction: column;
+  }
+
+  .repo-worker-actions button {
+    width: 100%;
+  }
+
+  .repo-worker-file-icon {
+    height: 100px;
+  }
+}

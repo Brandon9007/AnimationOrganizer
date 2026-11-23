@@ -6,6 +6,9 @@ import Slider from '@mui/material/Slider';
 
 function ViewsSection({
   views,
+  assetContexts,
+  assetError,
+  writeError,
   viewCounter,
   newViewNameInput,
   setNewViewNameInput,
@@ -43,7 +46,7 @@ function ViewsSection({
 }) {
   return (
     <div className="views-section-container">
-      <div className="views-header-left">
+      {currentUserRole === "admin" && <div className="views-header-left">
         <input
           type="text"
           className="view-name-input"
@@ -52,7 +55,9 @@ function ViewsSection({
           onChange={(e) => setNewViewNameInput(e.target.value)}
         />
         <button onClick={handleCreateView} className="add-view-button" title="Agregar vista">+</button>
-      </div>
+      </div>}
+      {assetError && <p className="empty-views-text" role="alert">{assetError}</p>}
+      {writeError && <p className="empty-views-text" role="alert">{writeError}</p>}
 
       <div className="views-content-area">
         {views.length === 0 ? (
@@ -67,7 +72,7 @@ function ViewsSection({
               <div
                 key={view.views_pk}
                 className="view-item-card"
-                draggable
+                draggable={currentUserRole === "admin" && !view.assetsOnly}
                 onDragStart={(e) => onDragStartView(e, view.views_pk)}
                 onDragOver={onDragOverView}
                 onDrop={(e) => onDropView(e, view.views_pk)}
@@ -102,7 +107,7 @@ function ViewsSection({
                     <h4 style={{ margin: 0 }}>{view.views_name}</h4>
                   </div>
 
-                  <div className="view-actions">
+                  {currentUserRole === "admin" && !view.assetsOnly && <div className="view-actions">
                     <button
                       className="view-action-btn update-btn"
                       onClick={(e) => {
@@ -121,7 +126,7 @@ function ViewsSection({
                     >
                       DELETE
                     </button>
-                  </div>
+                  </div>}
                 </div>
 
                 {/* SLIDER DE TRANSPARENCIA (OPACIDAD) */}
@@ -162,6 +167,8 @@ function ViewsSection({
                     <div onClick={(e) => e.stopPropagation()}>
                       <TasksSection
                         viewId={view.views_pk}
+                        assetContexts={assetContexts.filter(context => context.views_pk === view.views_pk)}
+                        canManage={currentUserRole === 'admin' && !view.assetsOnly}
                         tasks={tasks}
                         openTaskModal={openTaskModal}
                         openEditTaskModal={openEditTaskModal}

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone, date
 from passlib.context import CryptContext
 import jwt
 from jwt.exceptions import InvalidTokenError
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from model.rol import Role
@@ -57,6 +58,16 @@ def search_user_db(username: str, db: Session):
             disable=not user.is_active           
         )
     return None
+
+
+def is_admin(user: User, db: Session):
+    return db.scalar(
+        select(Role.role_pk).where(
+            Role.role_pk == user.user_rol_pk,
+            Role.is_active.is_(True),
+            func.lower(func.trim(Role.role_name)).in_(("admin", "administrador")),
+        )
+    ) is not None
     
 @router.post("/login")
 async def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
@@ -74,7 +85,10 @@ async def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depen
             detail="Contraseña incorrecta"
         )
 
-    rol_str = "admin" if user.user_rol_pk == 1 else "user"
+    if user.disable:
+        raise HTTPException(status_code=401, detail="Usuario deshabilitado")
+
+    rol_str = "admin" if is_admin(user, db) else "user"
 
     access_token = {
         "sub": user.user_name, 
@@ -98,10 +112,12 @@ async def auth_user(token: str = Depends(oauth2), db: Session = Depends(get_db))
     )
 
     try:
-        username = jwt.decode(token, SECRET, algorithms=[ALGORITMO]).get("sub")
-        if username is None:
-            raise exception
-    except InvalidTokenError: 
+        username = jwt.decode(
+            token, SECRET, algorithms=[ALGORITMO], options={"require": ["sub", "exp"]}
+        )["sub"]
+    except (InvalidTokenError, TypeError, ValueError) as exc:
+        raise exception from exc
+    if not isinstance(username, str) or not username:
         raise exception
 
     user = search_user_db(username, db)
@@ -117,6 +133,12 @@ async def current_user(user: User = Depends(auth_user)):
         )
     return user
 
-@router.get("/users/me")
+
+def require_admin(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    if not is_admin(user, db):
+        raise HTTPException(status_code=403, detail="Esta operación requiere un administrador.")
+
+
+@router.get("/users/me", response_model=User)
 async def me(user: User = Depends(current_user)):
     return user

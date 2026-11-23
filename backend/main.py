@@ -1,22 +1,19 @@
 #FastApi
-from fastapi import FastAPI, Depends, HTTPException, Header
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
-from typing import List
-from dotenv import load_dotenv  
-import requests
+from pathlib import Path
 import os
 
 #Middleware
 from fastapi.middleware.cors import CORSMiddleware
 
 #SQL
-from sqlalchemy.orm import Session
-from database.database import SessionLocal, engine
+from database.database import SessionLocal
 
 
 
 #Routers
+from routers import assets
 from routers.authentication.jwt_auth_users import router as login_router
 from routers.main.user_router import router as users_router
 from routers.main.rol_router import router as rol_router
@@ -38,11 +35,23 @@ from routers.main.proyectviews_router import router as project_views_router
 
 
 #main
-app = FastAPI()
+app = FastAPI(
+    title="AnimationOrganizer API",
+    description="API para la gestión de proyectos, tareas y assets.",
+    version="1.0.0",
+)
+
+class PublicUploads(StaticFiles):
+    def lookup_path(self, path):
+        full_path, stat_result = super().lookup_path(path)
+        if stat_result and Path(full_path).resolve().is_relative_to(assets.ASSETS_DIR.resolve()):
+            return "", None
+        return full_path, stat_result
+
 
 #Carpeta uploads
 os.makedirs("uploads", exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount("/uploads", PublicUploads(directory="uploads"), name="uploads")
 
 
 #middleware
@@ -79,6 +88,7 @@ app.include_router(comments_router)
 app.include_router(project_router)
 app.include_router(project_users_router)
 app.include_router(project_views_router)
+app.include_router(assets.router)
 
 #Funcion de Sesion de la base de datos 
 def get_db():
@@ -87,3 +97,8 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+@app.get("/", tags=["General"])
+def inicio():
+    return {"message": "AnimationOrganizer API funcionando correctamente", "status": "online"}

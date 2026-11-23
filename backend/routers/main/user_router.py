@@ -9,6 +9,8 @@ from model.rol import Role
 from sqlalchemy.orm import Session
 from database.database import SessionLocal, engine
 
+from routers.authentication.jwt_auth_users import require_admin
+
 router = APIRouter()
 
 class UsersClass(BaseModel):
@@ -44,7 +46,7 @@ async def obtener_users(db: Session = Depends(get_db)):
     }
 
 # POST
-@router.post("/users")
+@router.post("/users", dependencies=[Depends(require_admin)])
 def create_user(
     user_data: UsersClass,
     db: Session = Depends(get_db)
@@ -82,7 +84,7 @@ def create_user(
 
 
 # POST BULK
-@router.post("/users/bulk")
+@router.post("/users/bulk", dependencies=[Depends(require_admin)])
 def create_users_bulk(
     users: List[UsersClass],
     db: Session = Depends(get_db)
@@ -110,7 +112,7 @@ def create_users_bulk(
     }
 
 # PUT
-@router.put("/users/{user_id}")
+@router.put("/users/{user_id}", dependencies=[Depends(require_admin)])
 def update_user(
     user_id: int,
     user_data: UsersClass,
@@ -143,7 +145,7 @@ def update_user(
     }
 
 # DELETE
-@router.delete("/users/{user_pk}") # Corregido
+@router.delete("/users/{user_pk}", dependencies=[Depends(require_admin)]) # Corregido
 async def borrar_user(user_pk: int, db: Session = Depends(get_db)):
     user_actual = db.query(User).filter(User.user_pk == user_pk).first() # Corregido
 

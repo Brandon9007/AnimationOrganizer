@@ -7,6 +7,8 @@ from model.proyectusers import ProjectUsers
 from sqlalchemy.orm import Session
 from database.database import SessionLocal, engine
 
+from routers.authentication.jwt_auth_users import require_admin
+
 router = APIRouter()
 
 class ProjectUsersClass(BaseModel):
@@ -36,7 +38,7 @@ async def obtener_project_users(db: Session = Depends(get_db)):
     }
 
 # POST
-@router.post("/project_users")
+@router.post("/project_users", dependencies=[Depends(require_admin)])
 def create_project_user(
     project_user_data: ProjectUsersClass,
     db: Session = Depends(get_db)
@@ -68,7 +70,7 @@ def create_project_user(
     }
 
 # POST BULK
-@router.post("/project_users/bulk")
+@router.post("/project_users/bulk", dependencies=[Depends(require_admin)])
 def create_project_users_bulk(
     project_users_list: List[ProjectUsersClass],
     db: Session = Depends(get_db)
@@ -91,7 +93,7 @@ def create_project_users_bulk(
     }
 
 # PUT
-@router.put("/project_users/{project_user_id}")
+@router.put("/project_users/{project_user_id}", dependencies=[Depends(require_admin)])
 def update_project_user(
     project_user_id: int,
     project_user_data: ProjectUsersClass,
@@ -120,7 +122,7 @@ def update_project_user(
     }
 
 # DELETE
-@router.delete("/project_users/{project_users_pk}")
+@router.delete("/project_users/{project_users_pk}", dependencies=[Depends(require_admin)])
 async def borrar_project_user(project_users_pk: int, db: Session = Depends(get_db)):
     project_user_actual = db.query(ProjectUsers).filter(
         ProjectUsers.project_users_pk == project_users_pk

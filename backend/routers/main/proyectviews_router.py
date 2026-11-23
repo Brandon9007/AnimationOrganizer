@@ -7,6 +7,8 @@ from model.proyectviews import ProjectViews
 from sqlalchemy.orm import Session
 from database.database import SessionLocal, engine
 
+from routers.authentication.jwt_auth_users import require_admin
+
 router = APIRouter()
 
 class ProjectViewsClass(BaseModel):
@@ -36,7 +38,7 @@ async def obtener_project_views(db: Session = Depends(get_db)):
     }
 
 # POST
-@router.post("/project_views")
+@router.post("/project_views", dependencies=[Depends(require_admin)])
 def create_project_view(
     project_view_data: ProjectViewsClass,
     db: Session = Depends(get_db)
@@ -68,7 +70,7 @@ def create_project_view(
     }
 
 # POST BULK
-@router.post("/project_views/bulk")
+@router.post("/project_views/bulk", dependencies=[Depends(require_admin)])
 def create_project_views_bulk(
     project_views_list: List[ProjectViewsClass],
     db: Session = Depends(get_db)
@@ -91,7 +93,7 @@ def create_project_views_bulk(
     }
 
 # PUT
-@router.put("/project_views/{project_view_id}")
+@router.put("/project_views/{project_view_id}", dependencies=[Depends(require_admin)])
 def update_project_view(
     project_view_id: int,
     project_view_data: ProjectViewsClass,
@@ -120,7 +122,7 @@ def update_project_view(
     }
 
 # DELETE
-@router.delete("/project_views/{project_views_pk}")
+@router.delete("/project_views/{project_views_pk}", dependencies=[Depends(require_admin)])
 async def borrar_project_view(project_views_pk: int, db: Session = Depends(get_db)):
     project_view_actual = db.query(ProjectViews).filter(
         ProjectViews.project_views_pk == project_views_pk

@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import ViewsSection from './ViewsSection';
 import './Pipeline.css';
+import { requestTaskAssets } from '../../components/Sidebar/AssetsTarea';
 
 import Box from '@mui/material/Box';
 import Slider from '@mui/material/Slider';
@@ -52,7 +53,24 @@ function LayerVideo({ src, localTimeMs, isPlaying }) {
   );
 }
 
-function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
+async function writePipeline(url, options) {
+  const token = localStorage.getItem('fastapi_token');
+  if (!token) throw new Error('Inicia sesión para realizar cambios.');
+
+  const response = await fetch(url, {
+    ...options,
+    headers: { ...options.headers, Authorization: `Bearer ${token}` }
+  });
+  if (response.status === 401) throw new Error('Tu sesión no es válida o ha expirado.');
+  if (response.status === 403) throw new Error('Esta operación requiere un administrador.');
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new Error(typeof error?.detail === 'string' ? error.detail : 'No se pudo guardar el cambio.');
+  }
+  return response;
+}
+
+function Pipeline({ userRole = localStorage.getItem('user_role'), projectName = 'Proyecto X' }) {
   const currentUsername = localStorage.getItem('user_name') || userRole;
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -61,6 +79,9 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
 
   const [views, setViews] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [assetContexts, setAssetContexts] = useState([]);
+  const [assetError, setAssetError] = useState('');
+  const [writeError, setWriteError] = useState('');
 
   const [viewCounter, setViewCounter] = useState(1);
   const [newViewNameInput, setNewViewNameInput] = useState('');
@@ -86,7 +107,7 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
         const tasksResult = await tasksRes.json();
         setTasks(tasksResult.data || tasksResult);
       }
-    } catch (error) { console.error("Error de red:", error); }
+    } catch (error) { setWriteError(error.message); console.error("Error de red:", error); }
   };
 
   useEffect(() => {
@@ -99,11 +120,33 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
           setViews(sortedViews);
           setViewCounter(sortedViews.length + 1);
         }
-      } catch (error) { console.error("Error de red views:", error); }
+      } catch (error) { setWriteError(error.message); console.error("Error de red views:", error); }
     };
     fetchViews();
     fetchTasks();
   }, []);
+
+  useEffect(() => {
+    if (!localStorage.getItem('fastapi_token')) return;
+    const controller = new AbortController();
+    requestTaskAssets('/me/task-asset-contexts', controller.signal)
+      .then(response => response.json())
+      .then(result => {
+        if (!controller.signal.aborted) setAssetContexts(result.tasks);
+      })
+      .catch(error => {
+        if (!controller.signal.aborted) setAssetError(error.message);
+      });
+    return () => controller.abort();
+  }, []);
+
+  const visibleViews = new Map(views.map(view => [view.views_pk, view]));
+  for (const context of assetContexts) {
+    if (!visibleViews.has(context.views_pk)) {
+      visibleViews.set(context.views_pk, { ...context, assetsOnly: true });
+    }
+  }
+
 
   useEffect(() => {
     setGlobalProgressMs(0);
@@ -265,8 +308,8 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
       };
 
       try {
-        await fetch(`${API_BASE_URL}/tasks/${dragRef.current.taskId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedTask) });
-      } catch (error) { console.error('Error guardando duración:', error); }
+        await writePipeline(`${API_BASE_URL}/tasks/${dragRef.current.taskId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedTask) });
+      } catch (error) { setWriteError(error.message); console.error('Error guardando duración:', error); }
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -298,9 +341,9 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
     const taskB = { ...currentTasks[targetIndex], task_updated_at: todayDate };
 
     try {
-      await fetch(`${API_BASE_URL}/tasks/${taskA.tasks_pk}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(taskA) });
-      await fetch(`${API_BASE_URL}/tasks/${taskB.tasks_pk}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(taskB) });
-    } catch (error) { console.error("Error updating order:", error); }
+      await writePipeline(`${API_BASE_URL}/tasks/${taskA.tasks_pk}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(taskA) });
+      await writePipeline(`${API_BASE_URL}/tasks/${taskB.tasks_pk}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(taskB) });
+    } catch (error) { setWriteError(error.message); console.error("Error updating order:", error); }
   };
 
   // --- Reordenamiento de Vistas ---
@@ -326,9 +369,9 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
     const viewB = { ...currentViews[targetIndex] };
 
     try {
-      await fetch(`${API_BASE_URL}/views/${viewA.views_pk}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(viewA) });
-      await fetch(`${API_BASE_URL}/views/${viewB.views_pk}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(viewB) });
-    } catch (error) { console.error("Error updating view order:", error); }
+      await writePipeline(`${API_BASE_URL}/views/${viewA.views_pk}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(viewA) });
+      await writePipeline(`${API_BASE_URL}/views/${viewB.views_pk}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(viewB) });
+    } catch (error) { setWriteError(error.message); console.error("Error updating view order:", error); }
   };
 
   // --- Views CRUD ---
@@ -336,13 +379,13 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
     const finalViewName = newViewNameInput.trim() !== '' ? newViewNameInput : `view_${viewCounter}`;
     const newViewData = { views_name: finalViewName, views_order: views.length + 1, is_active: true };
     try {
-      const response = await fetch(`${API_BASE_URL}/views`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newViewData) });
+      const response = await writePipeline(`${API_BASE_URL}/views`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newViewData) });
       if (response.ok) {
         const result = await response.json();
         setViews([...views, result.data || result]);
         setViewCounter(viewCounter + 1); setNewViewNameInput('');
       }
-    } catch (error) { console.error('Error:', error); }
+    } catch (error) { setWriteError(error.message); console.error('Error:', error); }
   };
 
   const handleUpdateView = async (viewId, currentOrder) => {
@@ -350,9 +393,9 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
     if (!updatedName) return;
     const updatedViewData = { views_pk: viewId, views_name: updatedName, views_order: currentOrder, is_active: true };
     try {
-      const response = await fetch(`${API_BASE_URL}/views/${viewId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedViewData) });
+      const response = await writePipeline(`${API_BASE_URL}/views/${viewId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedViewData) });
       if (response.ok) setViews(views.map(v => v.views_pk === viewId ? { ...v, views_name: updatedName } : v));
-    } catch (error) { console.error('Error:', error); }
+    } catch (error) { setWriteError(error.message); console.error('Error:', error); }
   };
 
   const handleDeleteView = async (viewId) => {
@@ -360,9 +403,12 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
     if (tieneTareas) { alert("⚠️ No puedes borrar esta vista porque tiene tareas enlazadas. Borra las tareas primero."); return; }
     if (!window.confirm("¿Seguro que deseas eliminar esta vista?")) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/views/${viewId}`, { method: 'DELETE' });
-      if (response.ok) setViews(views.filter(v => v.views_pk !== viewId));
-    } catch (error) { console.error('Error:', error); }
+      const response = await writePipeline(`${API_BASE_URL}/views/${viewId}`, { method: 'DELETE' });
+      if (response.ok) {
+        setViews(views.filter(v => v.views_pk !== viewId));
+        setAssetContexts(contexts => contexts.filter(context => context.views_pk !== viewId));
+      }
+    } catch (error) { setWriteError(error.message); console.error('Error:', error); }
   };
 
   const toggleTaskDropdown = (viewId) => setOpenDropdownViewId(openDropdownViewId === viewId ? null : viewId);
@@ -392,17 +438,17 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
     };
 
     try {
-      const responseTask = await fetch(`${API_BASE_URL}/tasks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newTaskData) });
+      const responseTask = await writePipeline(`${API_BASE_URL}/tasks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newTaskData) });
       if (responseTask.ok) {
         const resultTask = await responseTask.json();
         const createdTask = resultTask.data || newTaskData;
         const newRelationData = { groups_tasks_views_name: `${createdTask.task_name}_view_${targetViewId}`, is_active: true, task_pk: createdTask.tasks_pk, views_pk: targetViewId };
-        const responseRelation = await fetch(`${API_BASE_URL}/groups_tasks_views`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newRelationData) });
+        const responseRelation = await writePipeline(`${API_BASE_URL}/groups_tasks_views`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newRelationData) });
 
         if (responseRelation.ok) { setTasks([...tasks, { ...createdTask, views_pk: targetViewId }]); closeTaskModal(); }
         else { alert("La tarea se creó, pero falló al enlazarla."); }
       }
-    } catch (error) { console.error('Error:', error); }
+    } catch (error) { setWriteError(error.message); console.error('Error:', error); }
   };
 
   const handleSaveUpdatedTask = async () => {
@@ -411,32 +457,35 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
     const updatedTaskData = { ...editTaskForm, task_updated_at: todayDate };
 
     try {
-      const response = await fetch(`${API_BASE_URL}/tasks/${editTaskForm.tasks_pk}`, {
+      const response = await writePipeline(`${API_BASE_URL}/tasks/${editTaskForm.tasks_pk}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedTaskData)
       });
       if (response.ok) {
         setTasks(tasks.map(t => t.tasks_pk === editTaskForm.tasks_pk ? updatedTaskData : t));
         closeEditTaskModal();
       }
-    } catch (error) { console.error('Error:', error); }
+    } catch (error) { setWriteError(error.message); console.error('Error:', error); }
   };
 
   const handleToggleLock = async (task) => {
     const updatedTaskData = { ...task, is_estatic: !task.is_estatic };
     try {
-      const response = await fetch(`${API_BASE_URL}/tasks/${task.tasks_pk}`, {
+      const response = await writePipeline(`${API_BASE_URL}/tasks/${task.tasks_pk}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedTaskData)
       });
       if (response.ok) setTasks(tasks.map(t => t.tasks_pk === task.tasks_pk ? updatedTaskData : t));
-    } catch (error) { console.error('Error toggling lock:', error); }
+    } catch (error) { setWriteError(error.message); console.error('Error toggling lock:', error); }
   };
 
   const handleDeleteTask = async (taskId) => {
     if (!window.confirm("¿Seguro que deseas eliminar esta tarea?")) return;
     try {
-      const response = await fetch(`${API_BASE_URL}/tasks/${taskId}`, { method: 'DELETE' });
-      if (response.ok) setTasks(tasks.filter(t => t.tasks_pk !== taskId));
-    } catch (error) { console.error('Error:', error); }
+      const response = await writePipeline(`${API_BASE_URL}/tasks/${taskId}`, { method: 'DELETE' });
+      if (response.ok) {
+        setTasks(tasks.filter(t => t.tasks_pk !== taskId));
+        setAssetContexts(contexts => contexts.filter(context => context.tasks_pk !== taskId));
+      }
+    } catch (error) { setWriteError(error.message); console.error('Error:', error); }
   };
 
   // --- STATUS & CHAT ---
@@ -446,13 +495,13 @@ function Pipeline({ userRole = 'admin', projectName = 'Proyecto X' }) {
     const updatedTaskData = { ...task, task_status: newStatus, task_updated_at: todayDate };
 
     try {
-      const response = await fetch(`${API_BASE_URL}/tasks/${task.tasks_pk}`, {
+      const response = await writePipeline(`${API_BASE_URL}/tasks/${task.tasks_pk}`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updatedTaskData)
       });
       if (response.ok) {
         setTasks(tasks.map(t => t.tasks_pk === task.tasks_pk ? updatedTaskData : t));
       }
-    } catch (error) { console.error('Error toggling status:', error); }
+    } catch (error) { setWriteError(error.message); console.error('Error toggling status:', error); }
   };
 
   const fetchTaskComments = async (taskId) => {
@@ -701,7 +750,7 @@ const handleAddComment = async (taskId, text) => {
                     key={task.tasks_pk}
                     className={taskBlockClasses}
                     title={`${task.task_name} (${task.tasks_duration})`}
-                    draggable={!task.is_estatic}
+                    draggable={userRole === 'admin' && !task.is_estatic}
                     onDragStart={(e) => {
                       if (task.is_estatic) e.preventDefault();
                       else onDragStartTask(e, task.tasks_pk);
@@ -724,7 +773,7 @@ const handleAddComment = async (taskId, text) => {
                       <span className="timeline-task-filename">{rawFileName}</span>
                     </span>
 
-                    {canResize && (
+                    {userRole === 'admin' && canResize && (
                       <div
                         className="timeline-resize-handle"
                         onMouseDown={(e) => handleDragStart(e, task)}
@@ -752,7 +801,10 @@ const handleAddComment = async (taskId, text) => {
       </div>
 
       <ViewsSection
-        views={views}
+        views={Array.from(visibleViews.values())}
+        assetContexts={assetContexts}
+        assetError={assetError}
+        writeError={writeError}
         viewCounter={viewCounter}
         newViewNameInput={newViewNameInput}
         setNewViewNameInput={setNewViewNameInput}

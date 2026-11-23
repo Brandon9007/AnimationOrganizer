@@ -18,6 +18,8 @@ from model.views import Views
 from sqlalchemy.orm import Session
 from database.database import SessionLocal, engine
 
+from routers.authentication.jwt_auth_users import require_admin
+
 router = APIRouter()
 
 class FilesTasksClass(BaseModel):
@@ -48,7 +50,7 @@ async def obtener_files_tasks(db: Session = Depends(get_db)):
     }
 
 # POST
-@router.post("/files_tasks")
+@router.post("/files_tasks", dependencies=[Depends(require_admin)])
 def create_file_task(
     file_task_data: FilesTasksClass,
     db: Session = Depends(get_db)
@@ -81,7 +83,7 @@ def create_file_task(
     }
 
 # POST BULK
-@router.post("/files_tasks/bulk")
+@router.post("/files_tasks/bulk", dependencies=[Depends(require_admin)])
 def create_files_tasks_bulk(
     files_tasks_list: List[FilesTasksClass],
     db: Session = Depends(get_db)
@@ -105,7 +107,7 @@ def create_files_tasks_bulk(
     }
 
 # PUT
-@router.put("/files_tasks/{file_task_id}")
+@router.put("/files_tasks/{file_task_id}", dependencies=[Depends(require_admin)])
 def update_file_task(
     file_task_id: int,
     file_task_data: FilesTasksClass,
@@ -135,7 +137,7 @@ def update_file_task(
     }
 
 # DELETE
-@router.delete("/files_tasks/{file_tasks_pk}")
+@router.delete("/files_tasks/{file_tasks_pk}", dependencies=[Depends(require_admin)])
 async def borrar_file_task(file_tasks_pk: int, db: Session = Depends(get_db)):
     file_task_actual = db.query(FilesTasks).filter(
         FilesTasks.files_tasks_pk == file_tasks_pk
