@@ -40,9 +40,12 @@ export default function Repositorio() {
   );
 
   const [assets, setAssets] = useState([]);
+  const [projectTasks, setProjectTasks] = useState([]);
+  const [linkedTasksByAsset, setLinkedTasksByAsset] = useState({});
+
   const [folder, setFolder] = useState('Todos los archivos');
   const [search, setSearch] = useState('');
-  const [sortBy, setSortBy] = useState('recent'); // 'recent' | 'name' | 'size'
+  const [sortBy, setSortBy] = useState('recent');
   const [view, setView] = useState('grid');
 
   const [loadingProjects, setLoadingProjects] = useState(true);
@@ -53,6 +56,12 @@ export default function Repositorio() {
   const [preview, setPreview] = useState(null);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef(null);
+
+  // Estado del modal para enlazar asset a tareas
+  const [linkingAsset, setLinkingAsset] = useState(null);
+  const [selectedTaskIds, setSelectedTaskIds] = useState([]);
+  const [loadingLinks, setLoadingLinks] = useState(false);
+  const [savingLinks, setSavingLinks] = useState(false);
 
   // 1. Cargar los proyectos reales del usuario
   useEffect(() => {
@@ -89,21 +98,27 @@ export default function Repositorio() {
     fetchProjects();
   }, [token]);
 
-  // 2. Cargar archivos del repositorio del proyecto seleccionado
-  const fetchAssets = async (projId) => {
+  // 2. Cargar archivos, tareas del proyecto y enlaces existentes
+  const fetchProjectData = async (projId) => {
     if (!projId) return;
     setLoadingAssets(true);
     setError('');
     try {
-      const res = await fetch(`${API_URL}/repositories/project/${projId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => null);
+      const headers = { Authorization: `Bearer ${token}` };
+      const [repoRes, viewsRes, tasksRes, groupsRes] = await Promise.all([
+        fetch(`${API_URL}/repositories/project/${projId}`, { headers }),
+        fetch(`${API_URL}/projects/${projId}/views`, { headers }),
+        fetch(`${API_URL}/tasks`, { headers }),
+        fetch(`${API_URL}/repository_groups`, { headers })
+      ]);
+
+      if (!repoRes.ok) {
+        const errJson = await repoRes.json().catch(() => null);
         throw new Error(errJson?.detail || 'Error al cargar los archivos del repositorio.');
       }
-      const json = await res.json();
-      const mapped = (json.data || []).map((item) => ({
+
+      const repoJson = await repoRes.json();
+      const mappedAssets = (repoJson.data || []).map((item) => ({
         id: item.repository_pk,
         name: item.file_name,
         description: item.repository_description,
@@ -111,9 +126,37 @@ export default function Repositorio() {
         category: categoryFromName(item.file_name),
         date: item.created_at,
         link: item.link,
-        url: `${API_URL}/${item.link}`
+        url: item.link?.startsWith('http') ? item.link : `${API_URL}/${item.link}`
       }));
-      setAssets(mapped);
+      setAssets(mappedAssets);
+
+      // Filtrar tareas pertenecientes a las vistas del proyecto actual
+      if (viewsRes.ok && tasksRes.ok) {
+        const viewsJson = await viewsRes.json();
+        const tasksJson = await tasksRes.json();
+        const viewMap = new Map(
+          (viewsJson.data || []).map((v) => [v.views_pk, v.views_name])
+        );
+        const filteredTasks = (tasksJson.data || [])
+          .filter((t) => t.is_active !== false && viewMap.has(t.views_pk))
+          .map((t) => ({
+            ...t,
+            view_name: viewMap.get(t.views_pk) || ''
+          }));
+        setProjectTasks(filteredTasks);
+      }
+
+      // Mapear enlaces activos por archivo
+      if (groupsRes.ok) {
+        const groupsJson = await groupsRes.json();
+        const map = {};
+        for (const g of groupsJson.data || []) {
+          if (g.is_active === false) continue;
+          if (!map[g.repository_fk]) map[g.repository_fk] = [];
+          map[g.repository_fk].push(g.tasks_fk);
+        }
+        setLinkedTasksByAsset(map);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -123,7 +166,7 @@ export default function Repositorio() {
 
   useEffect(() => {
     if (selectedProjectId) {
-      fetchAssets(selectedProjectId);
+      fetchProjectData(selectedProjectId);
     }
   }, [selectedProjectId]);
 
@@ -148,7 +191,7 @@ export default function Repositorio() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.detail || 'Error al subir los archivos.');
 
-      await fetchAssets(selectedProjectId);
+      await fetchProjectData(selectedProjectId);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -173,7 +216,64 @@ export default function Repositorio() {
     }
   };
 
-  // Descarga directa con el nombre original
+  // 5. Abrir modal de enlace con tareas y cargar selección actual
+  const openLinkModal = async (asset) => {
+    setLinkingAsset(asset);
+    setSelectedTaskIds(linkedTasksByAsset[asset.id] || []);
+    setLoadingLinks(true);
+    setError('');
+    try {
+      const res = await fetch(`${API_URL}/repositories/${asset.id}/tasks`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setSelectedTaskIds(json.task_ids || []);
+      }
+    } catch (err) {
+      console.error('Error cargando enlaces de tareas:', err);
+    } finally {
+      setLoadingLinks(false);
+    }
+  };
+
+  const toggleTaskSelection = (taskPk) => {
+    setSelectedTaskIds((prev) =>
+      prev.includes(taskPk) ? prev.filter((id) => id !== taskPk) : [...prev, taskPk]
+    );
+  };
+
+  const handleSaveLinks = async (e) => {
+    e.preventDefault();
+    if (!linkingAsset) return;
+
+    setSavingLinks(true);
+    setError('');
+    try {
+      const res = await fetch(`${API_URL}/repositories/${linkingAsset.id}/tasks`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ task_ids: selectedTaskIds })
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.detail || 'No se pudieron guardar los enlaces.');
+
+      setLinkedTasksByAsset((prev) => ({
+        ...prev,
+        [linkingAsset.id]: selectedTaskIds
+      }));
+      setLinkingAsset(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSavingLinks(false);
+    }
+  };
+
   const downloadAsset = async (asset) => {
     try {
       const response = await fetch(asset.url);
@@ -191,7 +291,6 @@ export default function Repositorio() {
     }
   };
 
-  // Filtrado y ordenamiento
   const filtered = useMemo(() => {
     const list = assets.filter(
       (a) =>
@@ -202,7 +301,7 @@ export default function Repositorio() {
     return [...list].sort((a, b) => {
       if (sortBy === 'name') return a.name.localeCompare(b.name);
       if (sortBy === 'size') return b.size - a.size;
-      return b.id - a.id; // 'recent'
+      return b.id - a.id;
     });
   }, [assets, folder, search, sortBy]);
 
@@ -236,7 +335,7 @@ export default function Repositorio() {
         <div>
           <span className="repo-eyebrow">BIBLIOTECA DE PRODUCCIÓN</span>
           <h1>Repositorio de assets</h1>
-          <p></p>
+          <p>Organiza, almacena y enlaza recursos con las tareas de tus proyectos.</p>
         </div>
 
         <button
@@ -261,7 +360,6 @@ export default function Repositorio() {
 
       {error && <div className="repo-worker-error">{error}</div>}
 
-      {/* Selector de proyecto real */}
       <div className="repo-project-bar">
         <div>
           <label htmlFor="repo-project">Proyecto actual</label>
@@ -293,7 +391,6 @@ export default function Repositorio() {
         )}
       </div>
 
-      {/* Estadísticas del proyecto */}
       <div className="repo-stats">
         <div>
           <strong>{assets.length}</strong>
@@ -413,41 +510,60 @@ export default function Repositorio() {
             </div>
           ) : filtered.length ? (
             <div className={`repo-assets ${view}`}>
-              {filtered.map((asset) => (
-                <article className="repo-asset" key={asset.id}>
-                  <button
-                    className="repo-thumbnail"
-                    onClick={() => setPreview(asset)}
-                    aria-label={`Vista previa de ${asset.name}`}
-                  >
-                    {asset.category === 'Imágenes' ? (
-                      <img src={asset.url} alt={asset.name} />
-                    ) : (
-                      <span>{icon(asset.category)}</span>
-                    )}
-                  </button>
+              {filtered.map((asset) => {
+                const linkedCount = (linkedTasksByAsset[asset.id] || []).length;
+                return (
+                  <article className="repo-asset" key={asset.id}>
+                    <button
+                      className="repo-thumbnail"
+                      onClick={() => setPreview(asset)}
+                      aria-label={`Vista previa de ${asset.name}`}
+                    >
+                      {asset.category === 'Imágenes' ? (
+                        <img src={asset.url} alt={asset.name} />
+                      ) : (
+                        <span>{icon(asset.category)}</span>
+                      )}
+                    </button>
 
-                  <div className="repo-asset-info">
-                    <strong title={asset.name}>{asset.name}</strong>
-                    <span>
-                      {asset.category} · {sizeLabel(asset.size)}
-                    </span>
-                    <small>{asset.date}</small>
-                  </div>
+                    <div className="repo-asset-info">
+                      <strong title={asset.name}>{asset.name}</strong>
+                      <span>
+                        {asset.category} · {sizeLabel(asset.size)}
+                      </span>
+                      <div className="repo-asset-meta-row">
+                        <small>{asset.date}</small>
+                        {linkedCount > 0 && (
+                          <span className="repo-link-badge">
+                            🔗 {linkedCount} {linkedCount === 1 ? 'tarea' : 'tareas'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
 
-                  <div className="repo-asset-actions">
-                    <button title="Ver" onClick={() => setPreview(asset)}>
-                      ◉
-                    </button>
-                    <button title="Descargar" onClick={() => downloadAsset(asset)}>
-                      ↓
-                    </button>
-                    <button title="Eliminar" onClick={() => removeAsset(asset)}>
-                      ×
-                    </button>
-                  </div>
-                </article>
-              ))}
+                    <div className="repo-asset-actions">
+                      {isAdmin && (
+                        <button
+                          className="repo-link-btn"
+                          title="Enlazar a tareas"
+                          onClick={() => openLinkModal(asset)}
+                        >
+                          🔗 Enlazar
+                        </button>
+                      )}
+                      <button title="Ver" onClick={() => setPreview(asset)}>
+                        ◉
+                      </button>
+                      <button title="Descargar" onClick={() => downloadAsset(asset)}>
+                        ↓
+                      </button>
+                      <button title="Eliminar" onClick={() => removeAsset(asset)}>
+                        ×
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           ) : (
             <div className="repo-empty">
@@ -466,6 +582,87 @@ export default function Repositorio() {
           )}
         </section>
       </div>
+
+      {/* Modal: Enlazar archivo a tareas del proyecto */}
+      {linkingAsset && isAdmin && (
+        <div className="repo-modal-backdrop" onClick={() => setLinkingAsset(null)}>
+          <div
+            className="repo-modal repo-link-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Enlazar archivo a tareas"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="repo-modal-header">
+              <div>
+                <span className="repo-eyebrow">VINCULAR RECURSO</span>
+                <h3 style={{ margin: '4px 0 0', fontSize: '18px', color: '#2e2246' }}>
+                  {linkingAsset.name}
+                </h3>
+              </div>
+              <button onClick={() => setLinkingAsset(null)}>×</button>
+            </div>
+
+            <form className="repo-link-form" onSubmit={handleSaveLinks}>
+              <p className="repo-link-hint">
+                Selecciona las tareas del proyecto que tendrán acceso a este asset ({selectedTaskIds.length}{' '}
+                seleccionadas):
+              </p>
+
+              {loadingLinks ? (
+                <div className="repo-empty" style={{ padding: '24px' }}>
+                  <p>Cargando tareas vinculadas...</p>
+                </div>
+              ) : projectTasks.length === 0 ? (
+                <div className="repo-empty" style={{ padding: '24px' }}>
+                  <p>Este proyecto aún no tiene tareas creadas en el Pipeline.</p>
+                </div>
+              ) : (
+                <div className="repo-tasks-list">
+                  {projectTasks.map((t) => {
+                    const checked = selectedTaskIds.includes(t.tasks_pk);
+                    return (
+                      <label
+                        key={t.tasks_pk}
+                        className={`repo-task-option ${checked ? 'selected' : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleTaskSelection(t.tasks_pk)}
+                        />
+                        <div>
+                          <strong>{t.task_name}</strong>
+                          <span>
+                            Vista: {t.view_name} · {t.task_status || 'Pendiente'}
+                          </span>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+
+              <div className="repo-modal-footer">
+                <button
+                  type="button"
+                  className="repo-outline"
+                  onClick={() => setLinkingAsset(null)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="repo-primary"
+                  disabled={savingLinks || loadingLinks}
+                >
+                  {savingLinks ? 'Guardando...' : 'Guardar enlaces'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Vista Previa */}
       {preview && (
